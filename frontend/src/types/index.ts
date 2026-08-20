@@ -4,6 +4,8 @@ export interface Goal {
   unit: string;
   targetValue: number;
   isActive: boolean;
+  description?: string;
+  daysOfWeek?: string[];
 }
 
 export interface WeeklyEntry {
