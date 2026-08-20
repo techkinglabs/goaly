@@ -5,51 +5,74 @@ interface GoalListProps {
   goals: Goal[];
   onEdit?: (goal: Goal) => void;
   onDelete?: (id: number) => void;
+  onSelect?: (goal: Goal) => void;
+  entries: any[]; // Added entries prop for progress calculation
 }
 
-const GoalList: React.FC<GoalListProps> = ({ goals, onEdit, onDelete }) => {
+const GoalList: React.FC<GoalListProps> = ({ goals, onEdit, onDelete, onSelect, entries }) => {
   const handleDelete = (id: number) => {
     return () => {
       if (onDelete) onDelete(id);
     };
   };
 
+  const handleClick = (goal: Goal) => {
+    if (onSelect) {
+      onSelect(goal);
+    }
+  };
+
+  // Calculate progress percentage for a goal
+  const calculateProgress = (goal: Goal) => {
+    if (!entries || entries.length === 0) return 0;
+    
+    const goalEntries = entries.filter(entry => entry.goalId === goal.id);
+    const totalActual = goalEntries.reduce((sum, entry) => sum + entry.actualValue, 0);
+    return Math.min((totalActual / goal.targetValue) * 100, 100); // Cap at 100%
+  };
+
+  // Get progress bar class based on percentage
+  const getProgressBarClass = (percentage: number) => {
+    if (percentage >= 100) return 'bg-green-500';
+    if (percentage >= 75) return 'bg-blue-500';
+    if (percentage >= 50) return 'bg-yellow-500';
+    if (percentage >= 25) return 'bg-orange-500';
+    return 'bg-red-500';
+  };
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {goals.map((goal) => (
-        <div key={goal.id} className="rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow dark:bg-gray-800">
-          <div className="flex justify-between items-start">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{goal.name}</h3>
-            <span className={`px-2 py-1 text-xs rounded-full ${goal.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
-              {goal.isActive ? 'Active' : 'Inactive'}
-            </span>
-          </div>
-          <p className="mt-2 text-gray-600 dark:text-gray-300">Unit: {goal.unit}</p>
-          <p className="mt-1 text-gray-600 dark:text-gray-300">Target: {goal.targetValue} {goal.unit}</p>
-          <p className="mt-2 text-gray-600 dark:text-gray-300">
-            Days: {goal.daysOfWeek ? goal.daysOfWeek.join(', ') : 'None'}
-          </p>
-          {goal.description && (
-            <p className="mt-2 text-gray-600 dark:text-gray-300">Description: {goal.description}</p>
-          )}
-          <div className="mt-4 flex justify-between items-center">
-            <div className="space-x-2">
-              <button 
-                onClick={() => onEdit && onEdit(goal)}
-                className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md text-sm hover:bg-blue-200 transition-colors dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800"
-              >
-                Edit
-              </button>
-              <button 
-                onClick={handleDelete(goal.id)}
-                className="px-3 py-1 bg-red-100 text-red-700 rounded-md text-sm hover:bg-red-200 transition-colors dark:bg-red-900 dark:text-red-200 dark:hover:bg-red-800"
-              >
-                Delete
-              </button>
+    <div className="space-y-2">
+      {goals.map((goal) => {
+        const progress = calculateProgress(goal);
+        const isGoalSelected = onSelect && goal.id === (goals.find(g => g.id === goal.id)?.id); // This will need to be improved
+        return (
+          <div 
+            key={goal.id} 
+            className={`p-3 rounded-lg cursor-pointer transition-colors ${isGoalSelected ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-100 dark:hover:bg-gray-700'} border dark:border-gray-600`}
+            onClick={() => handleClick(goal)}
+          >
+            <div className="flex justify-between items-start">
+              <h3 className="text-md font-medium text-gray-900 dark:text-white truncate">{goal.name}</h3>
+              <span className={`px-2 py-1 text-xs rounded-full ${goal.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
+                {goal.isActive ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+            
+            <div className="mt-2">
+              <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                <div 
+                  className={`h-2 rounded-full ${getProgressBarClass(progress)}`} 
+                  style={{ width: `${progress}%` }}
+                ></div>
+              </div>
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <span>{progress.toFixed(0)}%</span>
+                <span>{goal.targetValue} {goal.unit}</span>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

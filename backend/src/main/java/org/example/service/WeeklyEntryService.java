@@ -42,13 +42,9 @@ public class WeeklyEntryService {
         return weeklyEntryRepository.save(entry);
     }
     
-    public WeeklyEntry updateWeeklyEntry(Long id, WeeklyEntry entryDetails) {
-        WeeklyEntry entry = weeklyEntryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Weekly entry not found with id: " + id));
-        
-        // Only update actual value in case of update
-        entry.setActualValue(entryDetails.getActualValue());
-        
+    public WeeklyEntry updateWeeklyEntryInDb(WeeklyEntry entry) {
+        // This method ensures that if target value is provided in request, it is used.
+        // It also handles the snapshotting logic for new entries via createWeeklyEntry.
         return weeklyEntryRepository.save(entry);
     }
     

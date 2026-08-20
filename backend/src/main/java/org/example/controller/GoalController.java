@@ -1,14 +1,17 @@
 package org.example.controller;
 
 import jakarta.validation.Valid;
+import org.example.dto.GoalRequest;
+import org.example.dto.GoalResponse;
 import org.example.entity.Goal;
+import org.example.mapper.GoalMapper;
 import org.example.service.GoalService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/goals")
@@ -18,38 +21,37 @@ public class GoalController {
     private GoalService goalService;
     
     @GetMapping
-    public List<Goal> getAllActiveGoals() {
-        return goalService.getAllActiveGoals();
+    public List<GoalResponse> getAllActiveGoals() {
+        return goalService.getAllActiveGoals().stream()
+                .map(GoalMapper::toResponse)
+                .collect(Collectors.toList());
     }
     
     @GetMapping("/{id}")
-    public ResponseEntity<Goal> getGoalById(@PathVariable Long id) {
-        Optional<Goal> goal = goalService.getGoalById(id);
-        return goal.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<GoalResponse> getGoalById(@PathVariable Long id) {
+        return goalService.getGoalById(id)
+                .map(goal -> ResponseEntity.ok(GoalMapper.toResponse(goal)))
+                .orElse(ResponseEntity.notFound().build());
     }
     
     @PostMapping
-    public Goal createGoal(@RequestBody @Valid Goal goal) {
-        return goalService.createGoal(goal);
+    public ResponseEntity<GoalResponse> createGoal(@RequestBody @Valid GoalRequest goalRequest) {
+        Goal goal = GoalMapper.toEntity(goalRequest);
+        Goal createdGoal = goalService.createGoal(goal);
+        return ResponseEntity.status(201).body(GoalMapper.toResponse(createdGoal));
     }
     
     @PutMapping("/{id}")
-    public ResponseEntity<Goal> updateGoal(@PathVariable Long id, @RequestBody @Valid Goal goalDetails) {
-        try {
-            Goal updatedGoal = goalService.updateGoal(id, goalDetails);
-            return ResponseEntity.ok(updatedGoal);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<GoalResponse> updateGoal(@PathVariable Long id, @RequestBody @Valid GoalRequest goalRequest) {
+        Goal goal = goalService.getGoalById(id).orElseThrow(() -> new RuntimeException("Goal not found"));
+        GoalMapper.updateEntityFromRequest(goalRequest, goal);
+        Goal updatedGoal = goalService.updateGoalInDb(goal);
+        return ResponseEntity.ok(GoalMapper.toResponse(updatedGoal));
     }
     
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteGoal(@PathVariable Long id) {
-        try {
-            goalService.deleteGoal(id);
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        goalService.deleteGoal(id);
+        return ResponseEntity.noContent().build();
     }
 }

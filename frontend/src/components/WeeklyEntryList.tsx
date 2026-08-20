@@ -1,4 +1,5 @@
 import React from 'react';
+import { Pencil, Trash2 } from 'lucide-react';
 import type { Goal, WeeklyEntry } from '../types';
 
 interface WeeklyEntryListProps {
@@ -96,17 +97,21 @@ const WeeklyEntryList: React.FC<WeeklyEntryListProps> = ({
                   {onEdit && (
                     <button
                       onClick={() => onEdit(entry)}
+                      aria-label="Edit entry"
+                      title="Edit"
                       className="text-indigo-600 hover:text-indigo-900 mr-3 dark:text-indigo-400 dark:hover:text-indigo-300"
                     >
-                      Edit
+                      <Pencil size={18} />
                     </button>
                   )}
                   {onDelete && (
                     <button
                       onClick={() => onDelete(entry.id)}
+                      aria-label="Delete entry"
+                      title="Delete"
                       className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                     >
-                      Delete
+                      <Trash2 size={18} />
                     </button>
                   )}
                 </td>

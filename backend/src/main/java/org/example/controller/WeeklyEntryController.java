@@ -1,58 +1,65 @@
 package org.example.controller;
 
+import jakarta.validation.Valid;
+import org.example.dto.WeeklyEntryRequest;
+import org.example.dto.WeeklyEntryResponse;
+import org.example.mapper.WeeklyEntryMapper;
 import org.example.entity.WeeklyEntry;
 import org.example.service.WeeklyEntryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/entries")
+@Validated
 public class WeeklyEntryController {
     
     @Autowired
     private WeeklyEntryService weeklyEntryService;
     
     @GetMapping
-    public List<WeeklyEntry> getAllEntries(@RequestParam(required = false) Long goalId) {
+    public List<WeeklyEntryResponse> getAllEntries(@RequestParam(required = false) Long goalId) {
         if (goalId != null) {
-            return weeklyEntryService.getEntriesByGoalId(goalId);
+            return weeklyEntryService.getEntriesByGoalId(goalId).stream()
+                    .map(WeeklyEntryMapper::toResponse)
+                    .collect(Collectors.toList());
         }
-        // Return all entries
-        return weeklyEntryService.getAllEntries();
+        return weeklyEntryService.getAllEntries().stream()
+                .map(WeeklyEntryMapper::toResponse)
+                .collect(Collectors.toList());
     }
     
     @GetMapping("/{id}")
-    public ResponseEntity<WeeklyEntry> getEntryById(@PathVariable Long id) {
-        Optional<WeeklyEntry> entry = weeklyEntryService.getEntryById(id);
-        return entry.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<WeeklyEntryResponse> getEntryById(@PathVariable Long id) {
+        return weeklyEntryService.getEntryById(id)
+                .map(entry -> ResponseEntity.ok(WeeklyEntryMapper.toResponse(entry)))
+                .orElse(ResponseEntity.notFound().build());
     }
     
     @PostMapping
-    public WeeklyEntry createEntry(@RequestBody WeeklyEntry entry) {
-        return weeklyEntryService.createWeeklyEntry(entry);
+    public ResponseEntity<WeeklyEntryResponse> createEntry(@Valid @RequestBody WeeklyEntryRequest request) {
+        WeeklyEntry entry = WeeklyEntryMapper.toEntity(request);
+        WeeklyEntry createdEntry = weeklyEntryService.createWeeklyEntry(entry);
+        return ResponseEntity.status(201).body(WeeklyEntryMapper.toResponse(createdEntry));
     }
     
     @PutMapping("/{id}")
-    public ResponseEntity<WeeklyEntry> updateEntry(@PathVariable Long id, @RequestBody WeeklyEntry entryDetails) {
-        try {
-            WeeklyEntry updatedEntry = weeklyEntryService.updateWeeklyEntry(id, entryDetails);
-            return ResponseEntity.ok(updatedEntry);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+    public ResponseEntity<WeeklyEntryResponse> updateEntry(@PathVariable Long id, @Valid @RequestBody WeeklyEntryRequest request) {
+        WeeklyEntry entry = weeklyEntryService.getEntryById(id)
+                .orElseThrow(() -> new RuntimeException("Entry not found"));
+        WeeklyEntryMapper.updateEntityFromRequest(request, entry);
+        WeeklyEntry updatedEntry = weeklyEntryService.updateWeeklyEntryInDb(entry);
+        return ResponseEntity.ok(WeeklyEntryMapper.toResponse(updatedEntry));
     }
     
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteEntry(@PathVariable Long id) {
-        try {
-            weeklyEntryService.deleteWeeklyEntry(id);
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        weeklyEntryService.deleteWeeklyEntry(id);
+        return ResponseEntity.noContent().build();
     }
 }

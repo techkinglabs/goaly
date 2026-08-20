@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Goal } from '../types';
 
 interface CreateWeeklyEntryFormProps {
@@ -11,29 +11,36 @@ interface CreateWeeklyEntryFormProps {
 }
 
 const CreateWeeklyEntryForm: React.FC<CreateWeeklyEntryFormProps> = ({
-                                                                            goals,
-                                                                            onSubmit,
-                                                                        }) => {
-    const [selectedGoalId, setSelectedGoalId] = useState('');
+    goals,
+    onSubmit,
+}) => {
+    const [goalId, setGoalId] = useState<number | ''>('');
     const [weekStartDate, setWeekStartDate] = useState('');
     const [actualValue, setActualValue] = useState('');
+
+    // Set default date to today and default goal to the first available
+    useEffect(() => {
+        const today = new Date().toISOString().split('T')[0];
+        setWeekStartDate(today);
+        if (goals.length > 0 && goalId === '') {
+            setGoalId(goals[0].id);
+        }
+    }, [goals, goalId]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!selectedGoalId) {
-            alert('Please select a goal');
+        if (!goalId) {
+            alert('Please create a goal first.');
             return;
         }
 
         onSubmit({
-            goalId: Number(selectedGoalId),
+            goalId: Number(goalId),
             weekStartDate,
             actualValue: Number(actualValue),
         });
 
-        setSelectedGoalId('');
-        setWeekStartDate('');
         setActualValue('');
     };
 
@@ -43,32 +50,29 @@ const CreateWeeklyEntryForm: React.FC<CreateWeeklyEntryFormProps> = ({
             className="rounded-lg shadow-md p-6 w-full max-w-md dark:bg-gray-800"
         >
             <h3 className="text-lg font-semibold mb-4 dark:text-white">
-                Create Weekly Entry
+                Add Entry
             </h3>
 
             <div className="mb-4">
                 <label className="block text-sm font-medium mb-1 dark:text-gray-300">
                     Goal
                 </label>
-
                 <select
-                    value={selectedGoalId}
-                    onChange={(e) => setSelectedGoalId(e.target.value)}
+                    value={goalId}
+                    onChange={(e) => setGoalId(e.target.value ? Number(e.target.value) : '')}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-green-500 focus:border-green-500"
                     required
                 >
                     <option value="">Select a goal</option>
-                    {goals.map(goal => (
-                        <option key={goal.id} value={goal.id} className="dark:bg-gray-800 dark:text-white">
-                            {goal.name}
-                        </option>
+                    {goals.map((g) => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
                     ))}
                 </select>
             </div>
 
             <div className="mb-4">
                 <label className="block text-sm font-medium mb-1 dark:text-gray-300">
-                    Week Starting
+                    Entry Date
                 </label>
 
                 <input
@@ -99,7 +103,7 @@ const CreateWeeklyEntryForm: React.FC<CreateWeeklyEntryFormProps> = ({
                 type="submit"
                 className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
             >
-                Create Entry
+                Add Entry
             </button>
         </form>
     );

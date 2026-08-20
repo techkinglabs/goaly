@@ -31,7 +31,7 @@ const EditWeeklyEntryForm: React.FC<EditWeeklyEntryFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedGoalId || !weekStartDate || actualValue === '') {
+    if (!selectedGoalId || !weekStartDate || actualValue === '' || targetValue === '') {
       alert('Please fill in all required fields');
       return;
     }
@@ -52,9 +52,18 @@ const EditWeeklyEntryForm: React.FC<EditWeeklyEntryFormProps> = ({
         <label className="block text-sm font-bold mb-2 dark:text-gray-300" htmlFor="goalId">
           Goal
         </label>
-        <div id="goalId" className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:text-white dark:border-gray-600">
-          {goals.find(goal => goal.id === selectedGoalId)?.name || 'No goal selected'}
-        </div>
+        <select
+          id="goalId"
+          value={selectedGoalId}
+          onChange={(e) => setSelectedGoalId(e.target.value ? Number(e.target.value) : '')}
+          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:text-white dark:border-gray-600"
+          required
+        >
+          <option value="">Select a goal</option>
+          {goals.map((g) => (
+            <option key={g.id} value={g.id}>{g.name}</option>
+          ))}
+        </select>
       </div>
 
       <div className="mb-4">
@@ -90,9 +99,15 @@ const EditWeeklyEntryForm: React.FC<EditWeeklyEntryFormProps> = ({
         <label className="block text-sm font-bold mb-2 dark:text-gray-300" htmlFor="targetValue">
           Target Value
         </label>
-        <div id="targetValue" className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:text-white dark:border-gray-600">
-          {targetValue}
-        </div>
+        <input
+          id="targetValue"
+          type="number"
+          step="0.01"
+          value={targetValue}
+          onChange={(e) => setTargetValue(e.target.value ? Number(e.target.value) : '')}
+          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:text-white dark:border-gray-600"
+          required
+        />
       </div>
 
       <div className="flex justify-end space-x-3">

@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Entity
 @Table(name = "goals")
@@ -33,4 +34,11 @@ public class Goal {
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
+    
+    @Column(name = "description")
+    private String description;
+    
+    @ElementCollection(fetch = FetchType.EAGER)
+    @Column(name = "day_of_week")
+    private List<String> daysOfWeek;
 }

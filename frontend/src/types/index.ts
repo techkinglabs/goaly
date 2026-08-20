@@ -16,6 +16,12 @@ export interface WeeklyEntry {
   targetValue: number;
 }
 
+export interface ChartDataResponse {
+  weekStart: string;
+  goals: Record<string, number>;
+  totals: Record<string, number>;
+}
+
 export interface ChartDataPoint {
   name: string;
   value: number;

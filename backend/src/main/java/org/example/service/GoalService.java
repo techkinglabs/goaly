@@ -25,16 +25,11 @@ public class GoalService {
     public Goal createGoal(Goal goal) {
         return goalRepository.save(goal);
     }
-    
-    public Goal updateGoal(Long id, Goal goalDetails) {
-        Goal goal = goalRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Goal not found with id: " + id));
-        
-        goal.setName(goalDetails.getName());
-        goal.setUnit(goalDetails.getUnit());
-        goal.setTargetValue(goalDetails.getTargetValue());
-        goal.setIsActive(goalDetails.getIsActive());
-        
+
+    // This method was modified to support the refactored controller flow which uses 
+    // a mapping approach in the controller for better separation of concerns.
+    // We keep it here for direct entity updates from service if needed, but simplified.
+    public Goal updateGoalInDb(Goal goal) {
         return goalRepository.save(goal);
     }
     
