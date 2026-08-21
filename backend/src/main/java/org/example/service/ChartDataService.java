@@ -42,7 +42,7 @@ public class ChartDataService {
             weekData.put(goalKey, calculatePercentage(entry));
 
             double totalProgress = (target == 0.0) ? 0.0 :
-                    Math.min((runningActual.get(id) / target) * 100.0, 100.0);
+                    (runningActual.get(id) / target) * 100.0;
             weekData.put("total_" + id, totalProgress);
 
             weekData.put("weekStart", weekStart.toString());
@@ -74,7 +74,7 @@ public class ChartDataService {
             weekData.put(goalKey, calculatePercentage(entry));
 
             double totalProgress = (goalTarget == 0.0) ? 0.0 :
-                    Math.min((runningActual / goalTarget) * 100.0, 100.0);
+                    (runningActual / goalTarget) * 100.0;
             weekData.put("total_" + goalId, totalProgress);
         }
 
