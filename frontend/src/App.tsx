@@ -7,6 +7,7 @@ import EditGoalForm from './components/EditGoalForm';
 import CreateWeeklyEntryForm from './components/CreateWeeklyEntryForm';
 import EditWeeklyEntryForm from './components/EditWeeklyEntryForm';
 import GoalDetail from './components/GoalDetail';
+import { apiGet, apiSend, ApiError } from './api';
 import type { Goal, WeeklyEntry, ChartDataResponse } from './types';
 
 function App() {
@@ -20,49 +21,32 @@ function App() {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true); // Default to dark mode
   const [showCreateGoalModal, setShowCreateGoalModal] = useState(false);
   const [error, setError] = useState<string | null>(null); // Global error state
-  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null); // For Jira-style detail view
+  const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null); // For Jira-style detail view
+
+  const selectedGoal = goals.find((g) => g.id === selectedGoalId) ?? null;
 
   // Load data from API
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      // Use fixed internal addresses for Docker containers in localhost environment
-      const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-        ? 'http://localhost:8081' 
-        : '/api';
-        
       try {
-        // Fetch goals from backend
-        const goalsResponse = await fetch(`${baseUrl}/api/goals`);
-        if (!goalsResponse.ok) {
-          throw new Error(`Failed to fetch goals: ${goalsResponse.status} ${goalsResponse.statusText}`);
-        }
-        const fetchedGoals: Goal[] = await goalsResponse.json();
+        const fetchedGoals = await apiGet<Goal[]>('/api/goals');
         setGoals(fetchedGoals);
-        
-        // Select first goal if available
+
         if (fetchedGoals.length > 0) {
-          setSelectedGoal(fetchedGoals[0]);
+          setSelectedGoalId(fetchedGoals[0].id);
         }
-        
-        // Fetch entries from backend
-        const entriesResponse = await fetch(`${baseUrl}/api/entries`);
-        if (!entriesResponse.ok) {
-          throw new Error(`Failed to fetch entries: ${entriesResponse.status} ${entriesResponse.statusText}`);
-        }
-        const fetchedEntries: WeeklyEntry[] = await entriesResponse.json();
+
+        const fetchedEntries = await apiGet<WeeklyEntry[]>('/api/entries');
         setEntries(fetchedEntries);
-        
-        // Fetch chart data from backend
-        const chartResponse = await fetch(`${baseUrl}/api/chart/data`);
-        if (!chartResponse.ok) {
-          throw new Error(`Failed to fetch chart data: ${chartResponse.status} ${chartResponse.statusText}`);
-        }
-        const fetchedChartData: ChartDataResponse[] = await chartResponse.json();
+
+        const fetchedChartData = await apiGet<ChartDataResponse[]>('/api/chart/data');
         setChartData(fetchedChartData);
       } catch (err) {
         console.error('Error loading data:', err);
-        setError('Failed to load data. Please check your connection and try again.');
+        setError(err instanceof ApiError
+          ? `Failed to load data: ${err.message}`
+          : 'Failed to load data. Please check your connection and try again.');
       } finally {
         setLoading(false);
       }
@@ -80,40 +64,21 @@ function App() {
     daysOfWeek?: string[];
   }) => {
     try {
-      // Send new goal to backend
-      const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-        ? 'http://localhost:8081' 
-        : '/api';
-        
-      const response = await fetch(`${baseUrl}/api/goals`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(goalData),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to create goal: ${response.status} ${response.statusText}`);
-      }
-      
-      const newGoal: Goal = await response.json();
-      setGoals([...goals, newGoal]);
-      
-      // If this is the first goal, automatically select it
+      const newGoal: Goal = await apiSend<Goal>('/api/goals', 'POST', goalData);
+      setGoals((prev) => [...prev, newGoal]);
+
       if (goals.length === 0) {
-        setSelectedGoal(newGoal);
+        setSelectedGoalId(newGoal.id);
       }
     } catch (err) {
       console.error('Error creating goal:', err);
-      setError('Failed to create goal. Please try again.');
+      setError(err instanceof ApiError ? `Failed to create goal: ${err.message}` : 'Failed to create goal. Please try again.');
     }
   };
 
   const handleGoalEdit = async (updatedGoal: Omit<Goal, 'id'>) => {
     if (!editingGoal) return;
-    
-    // Extract only the fields that backend supports for now
+
     const backendCompatibleData = {
       name: updatedGoal.name,
       unit: updatedGoal.unit,
@@ -122,69 +87,36 @@ function App() {
       description: updatedGoal.description,
       daysOfWeek: updatedGoal.daysOfWeek
     };
-    
+
     try {
-      // Send updated goal to backend
-      const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-        ? 'http://localhost:8081' 
-        : '/api';
-        
-      const response = await fetch(`${baseUrl}/api/goals/${editingGoal.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(backendCompatibleData),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to update goal: ${response.status} ${response.statusText}`);
-      }
-      
-      const savedGoal: Goal = await response.json();
-      // Update the goal in state
-      setGoals(goals.map(goal => goal.id === savedGoal.id ? savedGoal : goal));
+      const savedGoal: Goal = await apiSend<Goal>(`/api/goals/${editingGoal.id}`, 'PUT', backendCompatibleData);
+      setGoals((prev) => prev.map((goal) => (goal.id === savedGoal.id ? savedGoal : goal)));
       setEditingGoal(null); // Close edit form
     } catch (err) {
       console.error('Error updating goal:', err);
-      setError('Failed to update goal. Please try again.');
+      setError(err instanceof ApiError ? `Failed to update goal: ${err.message}` : 'Failed to update goal. Please try again.');
     }
   };
 
   const handleGoalDelete = async (id: number) => {
-    // Ensure ID is valid before proceeding
     if (!id || isNaN(id)) {
       console.error('Invalid goal ID provided for deletion:', id);
       setError('Invalid goal ID provided');
       return;
     }
-    
+
     if (!window.confirm('Are you sure you want to delete this goal?')) {
       return;
     }
-    
+
     try {
-      // Send delete request to backend
-      const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-        ? 'http://localhost:8081' 
-        : '/api';
-        
-      const response = await fetch(`${baseUrl}/api/goals/${id}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to delete goal: ${response.status} ${response.statusText}`);
-      }
-      
-      // Remove the goal from state
-      setGoals(goals.filter(goal => goal.id !== id));
-      if (selectedGoal?.id === id) {
-        setSelectedGoal(null);
-      }
+      await apiSend<void>(`/api/goals/${id}`, 'DELETE');
+
+      setGoals((prev) => prev.filter((goal) => goal.id !== id));
+      setSelectedGoalId((prev) => (prev === id ? null : prev));
     } catch (err) {
       console.error('Error deleting goal:', err);
-      setError('Failed to delete goal. Please try again.');
+      setError(err instanceof ApiError ? `Failed to delete goal: ${err.message}` : 'Failed to delete goal. Please try again.');
     }
   };
 
@@ -202,59 +134,24 @@ function App() {
     actualValue: number;
   }) => {
     try {
-      // Send new entry to backend
-      const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-        ? 'http://localhost:8081' 
-        : '/api';
-        
-      const response = await fetch(`${baseUrl}/api/entries`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(entryData),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to create entry: ${response.status} ${response.statusText}`);
-      }
-      
-      const savedEntry: WeeklyEntry = await response.json();
-      setEntries([...entries, savedEntry]);
+      const savedEntry: WeeklyEntry = await apiSend<WeeklyEntry>('/api/entries', 'POST', entryData);
+      setEntries((prev) => [...prev, savedEntry]);
     } catch (err) {
       console.error('Error creating entry:', err);
-      setError('Failed to create entry. Please try again.');
+      setError(err instanceof ApiError ? `Failed to create entry: ${err.message}` : 'Failed to create entry. Please try again.');
     }
   };
 
   const handleEntryEdit = async (updatedEntry: Omit<WeeklyEntry, 'id'>) => {
     if (!editingEntry) return;
-    
+
     try {
-      // Send updated entry to backend
-      const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-        ? 'http://localhost:8081' 
-        : '/api';
-        
-      const response = await fetch(`${baseUrl}/api/entries/${editingEntry.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedEntry),
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to update entry: ${response.status} ${response.statusText}`);
-      }
-      
-      const savedEntry: WeeklyEntry = await response.json();
-      // Update the entry in state
-      setEntries(entries.map(entry => entry.id === savedEntry.id ? savedEntry : entry));
+      const savedEntry: WeeklyEntry = await apiSend<WeeklyEntry>(`/api/entries/${editingEntry.id}`, 'PUT', updatedEntry);
+      setEntries((prev) => prev.map((entry) => (entry.id === savedEntry.id ? savedEntry : entry)));
       setEditingEntry(null); // Close edit form
     } catch (err) {
       console.error('Error updating entry:', err);
-      setError('Failed to update entry. Please try again.');
+      setError(err instanceof ApiError ? `Failed to update entry: ${err.message}` : 'Failed to update entry. Please try again.');
     }
   };
 
@@ -262,26 +159,13 @@ function App() {
     if (!window.confirm('Are you sure you want to delete this entry?')) {
       return;
     }
-    
+
     try {
-      // Send delete request to backend
-      const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-        ? 'http://localhost:8081' 
-        : '/api';
-        
-      const response = await fetch(`${baseUrl}/api/entries/${id}`, {
-        method: 'DELETE',
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to delete entry: ${response.status} ${response.statusText}`);
-      }
-      
-      // Remove entry from state
-      setEntries(entries.filter(entry => entry.id !== id));
+      await apiSend<void>(`/api/entries/${id}`, 'DELETE');
+      setEntries((prev) => prev.filter((entry) => entry.id !== id));
     } catch (err) {
       console.error('Error deleting entry:', err);
-      setError('Failed to delete entry. Please try again.');
+      setError(err instanceof ApiError ? `Failed to delete entry: ${err.message}` : 'Failed to delete entry. Please try again.');
     }
   };
 
@@ -293,9 +177,8 @@ function App() {
     setEditingEntry(null);
   };
 
-  // Function to handle selecting a goal for detail view
   const handleSelectGoal = (goal: Goal) => {
-    setSelectedGoal(goal);
+    setSelectedGoalId(goal.id);
     // We don't change tab here to maintain the split-pane layout
   };
 
@@ -305,12 +188,6 @@ function App() {
         <div className="container mx-auto flex justify-between items-center">
           <h1 className="text-2xl font-bold">Weekly Progress Tracker</h1>
           <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setShowCreateGoalModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition duration-200 text-sm"
-            >
-              Create Goal
-            </button>
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
               className={`p-2 rounded-full ${isDarkMode ? 'bg-gray-700 text-yellow-300' : 'bg-blue-500 text-white'}`}
@@ -333,23 +210,30 @@ function App() {
       <nav className={isDarkMode ? 'bg-gray-800 shadow-sm' : 'bg-white shadow-sm'}>
         <div className="container mx-auto">
           <div className="flex space-x-8">
-            <button 
+            <button
               onClick={() => setActiveTab('goals')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'goals' || activeTab === 'details' ? (isDarkMode ? 'border-blue-500 text-blue-400' : 'border-blue-500 text-blue-600') : (isDarkMode ? 'border-transparent text-gray-300 hover:text-gray-100 hover:border-gray-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300')}`}
             >
               Goals
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('entries')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'entries' ? (isDarkMode ? 'border-blue-500 text-blue-400' : 'border-blue-500 text-blue-600') : (isDarkMode ? 'border-transparent text-gray-300 hover:text-gray-100 hover:border-gray-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300')}`}
             >
               Weekly Entries
             </button>
-            <button 
+            <button
               onClick={() => setActiveTab('charts')}
               className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'charts' ? (isDarkMode ? 'border-blue-500 text-blue-400' : 'border-blue-500 text-blue-600') : (isDarkMode ? 'border-transparent text-gray-300 hover:text-gray-100 hover:border-gray-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300')}`}
             >
               Charts
+            </button>
+            <button
+              onClick={() => setShowCreateGoalModal(true)}
+              className={`py-4 px-3 border-b-2 border-transparent text-xl font-bold ${isDarkMode ? 'text-gray-300 hover:text-gray-100' : 'text-gray-500 hover:text-gray-700'}`}
+              aria-label="Create Goal"
+            >
+              +
             </button>
           </div>
         </div>
@@ -359,7 +243,7 @@ function App() {
         {error && (
           <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
             <p>{error}</p>
-            <button 
+            <button
               onClick={() => setError(null)}
               className="mt-2 text-sm underline"
             >
@@ -367,7 +251,7 @@ function App() {
             </button>
           </div>
         )}
-        
+
         {loading ? (
           <div className="text-center py-8">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
@@ -380,18 +264,18 @@ function App() {
                 <div className="w-1/3 border-r dark:border-gray-700 overflow-y-auto p-4">
                   <div className="flex justify-between items-center mb-6">
                   </div>
-                  
+
                   {editingGoal ? (
-                    <EditGoalForm 
-                      goal={editingGoal} 
-                      onSubmit={handleGoalEdit} 
-                      onCancel={handleCancelEdit} 
+                    <EditGoalForm
+                      goal={editingGoal}
+                      onSubmit={handleGoalEdit}
+                      onCancel={handleCancelEdit}
                     />
                   ) : null}
-                  
-                  <GoalList goals={goals} onEdit={handleEditGoal} onDelete={handleGoalDelete} onSelect={handleSelectGoal} entries={entries} />
+
+                  <GoalList goals={goals} selectedGoalId={selectedGoalId} onEdit={handleEditGoal} onDelete={handleGoalDelete} onSelect={handleSelectGoal} entries={entries} />
                 </div>
-                
+
                 <div className="w-2/3 overflow-y-auto p-4">
                   {selectedGoal ? (
                     <GoalDetail
@@ -426,19 +310,19 @@ function App() {
                   <h2 className="text-xl font-semibold">Weekly Entries</h2>
                   <CreateWeeklyEntryForm goals={goals} onSubmit={handleEntrySubmit} />
                 </div>
-                
+
                 {editingEntry ? (
-                  <EditWeeklyEntryForm 
-                    entry={editingEntry} 
+                  <EditWeeklyEntryForm
+                    entry={editingEntry}
                     goals={goals.map(g => ({id: g.id, name: g.name}))}
-                    onSubmit={handleEntryEdit} 
-                    onCancel={cancelEditEntry} 
+                    onSubmit={handleEntryEdit}
+                    onCancel={cancelEditEntry}
                   />
                 ) : null}
-                
-                <WeeklyEntryList 
-                  entries={entries} 
-                  goals={goals} 
+
+                <WeeklyEntryList
+                  entries={entries}
+                  goals={goals}
                   onEdit={handleEditEntry}
                   onDelete={handleEntryDelete}
                 />
@@ -462,7 +346,7 @@ function App() {
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Create New Goal</h3>
-                <button 
+                <button
                   onClick={() => setShowCreateGoalModal(false)}
                   className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 >

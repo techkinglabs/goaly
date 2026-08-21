@@ -31,7 +31,7 @@ const EditWeeklyEntryForm: React.FC<EditWeeklyEntryFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedGoalId || !weekStartDate || actualValue === '' || targetValue === '') {
+    if (!selectedGoalId || !weekStartDate || actualValue === '') {
       alert('Please fill in all required fields');
       return;
     }
@@ -99,15 +99,16 @@ const EditWeeklyEntryForm: React.FC<EditWeeklyEntryFormProps> = ({
         <label className="block text-sm font-bold mb-2 dark:text-gray-300" htmlFor="targetValue">
           Target Value
         </label>
-        <input
-          id="targetValue"
-          type="number"
-          step="0.01"
-          value={targetValue}
-          onChange={(e) => setTargetValue(e.target.value ? Number(e.target.value) : '')}
-          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:text-white dark:border-gray-600"
-          required
-        />
+          <input
+            id="targetValue"
+            type="number"
+            step="0.01"
+            value={targetValue}
+            onChange={(e) => setTargetValue(e.target.value ? Number(e.target.value) : '')}
+            readOnly
+            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:text-white dark:border-gray-600 opacity-70 cursor-not-allowed"
+            required
+          />
       </div>
 
       <div className="flex justify-end space-x-3">

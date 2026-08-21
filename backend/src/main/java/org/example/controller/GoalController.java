@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import org.example.dto.GoalRequest;
 import org.example.dto.GoalResponse;
 import org.example.entity.Goal;
+import org.example.exception.ResourceNotFoundException;
 import org.example.mapper.GoalMapper;
 import org.example.service.GoalService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,7 +44,7 @@ public class GoalController {
     
     @PutMapping("/{id}")
     public ResponseEntity<GoalResponse> updateGoal(@PathVariable Long id, @RequestBody @Valid GoalRequest goalRequest) {
-        Goal goal = goalService.getGoalById(id).orElseThrow(() -> new RuntimeException("Goal not found"));
+        Goal goal = goalService.getGoalById(id).orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
         GoalMapper.updateEntityFromRequest(goalRequest, goal);
         Goal updatedGoal = goalService.updateGoalInDb(goal);
         return ResponseEntity.ok(GoalMapper.toResponse(updatedGoal));

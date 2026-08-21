@@ -39,6 +39,10 @@ public class Goal {
     private String description;
     
     @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "goal_days_of_week",
+            joinColumns = @JoinColumn(name = "goal_id")
+    )
     @Column(name = "day_of_week")
     private List<String> daysOfWeek;
 }

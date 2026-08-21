@@ -1,15 +1,23 @@
 import React from 'react';
-import { Goal } from '../types';
+import { Goal, WeeklyEntry } from '../types';
 
 interface GoalListProps {
   goals: Goal[];
+  selectedGoalId: number | null;
   onEdit?: (goal: Goal) => void;
   onDelete?: (id: number) => void;
   onSelect?: (goal: Goal) => void;
-  entries: any[]; // Added entries prop for progress calculation
+  entries: WeeklyEntry[];
 }
 
-const GoalList: React.FC<GoalListProps> = ({ goals, onEdit, onDelete, onSelect, entries }) => {
+const calculateProgress = (goal: Goal, entries: WeeklyEntry[]): number => {
+  if (!goal.targetValue || goal.targetValue === 0) return 0;
+  const goalEntries = entries.filter((entry) => entry.goalId === goal.id);
+  const totalActual = goalEntries.reduce((sum, entry) => sum + (entry.actualValue ?? 0), 0);
+  return Math.min((totalActual / goal.targetValue) * 100, 100); // Cap at 100%
+};
+
+const GoalList: React.FC<GoalListProps> = ({ goals, selectedGoalId, onEdit, onDelete, onSelect, entries }) => {
   const handleDelete = (id: number) => {
     return () => {
       if (onDelete) onDelete(id);
@@ -20,15 +28,6 @@ const GoalList: React.FC<GoalListProps> = ({ goals, onEdit, onDelete, onSelect, 
     if (onSelect) {
       onSelect(goal);
     }
-  };
-
-  // Calculate progress percentage for a goal
-  const calculateProgress = (goal: Goal) => {
-    if (!entries || entries.length === 0) return 0;
-    
-    const goalEntries = entries.filter(entry => entry.goalId === goal.id);
-    const totalActual = goalEntries.reduce((sum, entry) => sum + entry.actualValue, 0);
-    return Math.min((totalActual / goal.targetValue) * 100, 100); // Cap at 100%
   };
 
   // Get progress bar class based on percentage
@@ -43,11 +42,11 @@ const GoalList: React.FC<GoalListProps> = ({ goals, onEdit, onDelete, onSelect, 
   return (
     <div className="space-y-2">
       {goals.map((goal) => {
-        const progress = calculateProgress(goal);
-        const isGoalSelected = onSelect && goal.id === (goals.find(g => g.id === goal.id)?.id); // This will need to be improved
+        const progress = calculateProgress(goal, entries);
+        const isGoalSelected = goal.id === selectedGoalId;
         return (
-          <div 
-            key={goal.id} 
+          <div
+            key={goal.id}
             className={`p-3 rounded-lg cursor-pointer transition-colors ${isGoalSelected ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-100 dark:hover:bg-gray-700'} border dark:border-gray-600`}
             onClick={() => handleClick(goal)}
           >

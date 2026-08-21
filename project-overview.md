@@ -1,0 +1,5 @@
+- we use external DB Postgresql, do not add new DB to docker file
+- we have only 1 main DB
+- ensure that DB connection is correct
+- if you change backend ensure that is possible to build without errors
+- if you change frontend ensure that is possible to build without errors

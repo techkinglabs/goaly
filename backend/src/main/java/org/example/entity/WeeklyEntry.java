@@ -11,7 +11,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "weekly_entries")
+@Table(name = "weekly_entries", uniqueConstraints = @UniqueConstraint(
+        name = "uk_weekly_entry_goal_week",
+        columnNames = {"goal_id", "week_start_date"}
+))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

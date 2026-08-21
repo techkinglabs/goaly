@@ -3,8 +3,9 @@ package org.example.controller;
 import jakarta.validation.Valid;
 import org.example.dto.WeeklyEntryRequest;
 import org.example.dto.WeeklyEntryResponse;
-import org.example.mapper.WeeklyEntryMapper;
 import org.example.entity.WeeklyEntry;
+import org.example.exception.ResourceNotFoundException;
+import org.example.mapper.WeeklyEntryMapper;
 import org.example.service.WeeklyEntryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -51,7 +52,7 @@ public class WeeklyEntryController {
     @PutMapping("/{id}")
     public ResponseEntity<WeeklyEntryResponse> updateEntry(@PathVariable Long id, @Valid @RequestBody WeeklyEntryRequest request) {
         WeeklyEntry entry = weeklyEntryService.getEntryById(id)
-                .orElseThrow(() -> new RuntimeException("Entry not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Entry not found with id: " + id));
         WeeklyEntryMapper.updateEntityFromRequest(request, entry);
         WeeklyEntry updatedEntry = weeklyEntryService.updateWeeklyEntryInDb(entry);
         return ResponseEntity.ok(WeeklyEntryMapper.toResponse(updatedEntry));

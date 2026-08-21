@@ -1,6 +1,7 @@
 package org.example.service;
 
 import org.example.entity.Goal;
+import org.example.exception.ResourceNotFoundException;
 import org.example.repository.GoalRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -35,7 +36,7 @@ public class GoalService {
     
     public void deleteGoal(Long id) {
         Goal goal = goalRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Goal not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
         
         goalRepository.delete(goal);
     }

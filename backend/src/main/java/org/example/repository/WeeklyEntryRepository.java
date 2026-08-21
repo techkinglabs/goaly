@@ -10,4 +10,6 @@ import java.util.List;
 @Repository
 public interface WeeklyEntryRepository extends JpaRepository<WeeklyEntry, Long> {
     List<WeeklyEntry> findByGoalIdOrderByWeekStartDate(Long goalId);
+
+    boolean existsByGoalIdAndWeekStartDate(Long goalId, LocalDate weekStartDate);
 }

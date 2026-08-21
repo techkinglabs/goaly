@@ -27,7 +27,7 @@ public class ChartDataService {
         goalRepository.findAll().forEach(g -> goalTargets.put(g.getId(), g.getTargetValue().doubleValue()));
 
         Map<LocalDate, Map<String, Object>> groupedData = new LinkedHashMap<>();
-        Map<Long, Double> runningPct = new HashMap<>();
+        Map<Long, Double> runningActual = new HashMap<>();
 
         for (WeeklyEntry entry : allEntries) {
             LocalDate weekStart = entry.getWeekStartDate();
@@ -35,14 +35,14 @@ public class ChartDataService {
             Map<String, Object> weekData = groupedData.get(weekStart);
 
             long id = entry.getGoalId();
-            runningPct.merge(id, calculatePercentage(entry), Double::sum);
+            double target = goalTargets.getOrDefault(id, 0.0);
+            runningActual.merge(id, entry.getActualValue().doubleValue(), Double::sum);
 
             String goalKey = "goal_" + id;
             weekData.put(goalKey, calculatePercentage(entry));
 
-            double target = goalTargets.getOrDefault(id, 0.0);
             double totalProgress = (target == 0.0) ? 0.0 :
-                    runningPct.get(id);
+                    Math.min((runningActual.get(id) / target) * 100.0, 100.0);
             weekData.put("total_" + id, totalProgress);
 
             weekData.put("weekStart", weekStart.toString());
@@ -60,21 +60,21 @@ public class ChartDataService {
                 .orElse(0.0);
 
         Map<LocalDate, Map<String, Object>> groupedData = new LinkedHashMap<>();
-        double runningPct = 0.0;
+        double runningActual = 0.0;
 
         for (WeeklyEntry entry : entries) {
             LocalDate weekStart = entry.getWeekStartDate();
             groupedData.putIfAbsent(weekStart, new HashMap<>());
             Map<String, Object> weekData = groupedData.get(weekStart);
 
-            runningPct += calculatePercentage(entry);
+            runningActual += entry.getActualValue().doubleValue();
 
             String goalKey = "goal_" + goalId;
             weekData.put("weekStart", weekStart.toString());
             weekData.put(goalKey, calculatePercentage(entry));
 
             double totalProgress = (goalTarget == 0.0) ? 0.0 :
-                    runningPct;
+                    Math.min((runningActual / goalTarget) * 100.0, 100.0);
             weekData.put("total_" + goalId, totalProgress);
         }
 
