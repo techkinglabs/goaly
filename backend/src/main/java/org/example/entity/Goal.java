@@ -32,6 +32,12 @@ public class Goal {
     @NotNull(message = "Target value is required")
     private BigDecimal targetValue;
 
+    @Column(name = "period", nullable = false)
+    private String period = "ONGOING";
+
+    @Column(name = "amount_per_period", nullable = false)
+    private BigDecimal amountPerPeriod = BigDecimal.ZERO;
+
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
     

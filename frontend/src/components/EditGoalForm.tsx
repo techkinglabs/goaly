@@ -16,6 +16,8 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
   const [isActive, setIsActive] = useState(true);
   const [description, setDescription] = useState('');
   const [daysOfWeek, setDaysOfWeek] = useState<string[]>([]);
+  const [period, setPeriod] = useState('ONGOING');
+  const [amountPerPeriod, setAmountPerPeriod] = useState<number | ''>('');
 
   useEffect(() => {
     if (goal) {
@@ -34,6 +36,8 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
       setIsActive(goal.isActive);
       setDescription(goal.description || '');
       setDaysOfWeek(goal.daysOfWeek || []);
+      setPeriod(goal.period || 'ONGOING');
+      setAmountPerPeriod(goal.amountPerPeriod ?? goal.targetValue);
     }
   }, [goal]);
 
@@ -56,7 +60,9 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
       targetValue: Number(targetValue),
       isActive,
       description,
-      daysOfWeek
+      daysOfWeek,
+      period,
+      amountPerPeriod: amountPerPeriod === '' ? Number(targetValue) : Number(amountPerPeriod)
     });
   };
 
@@ -80,12 +86,12 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
     setDaysOfWeek(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY']);
   };
 
-  return (
-    <form onSubmit={handleSubmit} className="p-6 rounded-lg shadow-md mb-6 dark:bg-gray-800">
-      <h3 className="text-lg font-semibold mb-4 dark:text-white">Edit Goal</h3>
+    return (
+    <form onSubmit={handleSubmit} className="surface !mb-0 rounded-xl p-6">
+      <h3 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">Edit Goal</h3>
       
       <div className="mb-4">
-        <label className="block text-sm font-bold mb-2 dark:text-gray-300" htmlFor="name">
+        <label className="form-label" htmlFor="name">
           Name *
         </label>
         <input
@@ -93,13 +99,13 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+          className="form-input"
           required
         />
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-bold mb-2 dark:text-gray-300" htmlFor="unit">
+        <label className="form-label" htmlFor="unit">
           Unit *
         </label>
         <select
@@ -114,7 +120,7 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
               setUnit(e.target.value);
             }
           }}
-          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+          className="form-input"
           required
         >
           <option value="">Select a unit</option>
@@ -133,14 +139,14 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
             value={customUnit}
             onChange={(e) => setCustomUnit(e.target.value)}
             placeholder="Enter custom unit"
-            className="mt-2 shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+            className="mt-2 form-input"
             required
           />
         )}
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-bold mb-2 dark:text-gray-300" htmlFor="targetValue">
+        <label className="form-label" htmlFor="targetValue">
           Target Value
         </label>
         <input
@@ -148,43 +154,75 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
           type="number"
           value={targetValue}
           onChange={(e) => setTargetValue(e.target.value ? Number(e.target.value) : '')}
-          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+          className="form-input"
+        />
+      </div>
+
+      <div className="mb-4">
+        <label className="form-label" htmlFor="period">
+          Period
+        </label>
+        <select
+          id="period"
+          value={period}
+          onChange={(e) => setPeriod(e.target.value)}
+          className="form-input"
+        >
+          <option value="ONGOING">Ongoing (forever)</option>
+          <option value="WEEK">Per Week</option>
+          <option value="MONTH">Per Month</option>
+          <option value="YEAR">Per Year</option>
+        </select>
+      </div>
+
+      <div className="mb-4">
+        <label className="form-label" htmlFor="amountPerPeriod">
+          Amount per Period
+        </label>
+        <input
+          id="amountPerPeriod"
+          type="number"
+          step="0.01"
+          value={amountPerPeriod}
+          onChange={(e) => setAmountPerPeriod(e.target.value ? Number(e.target.value) : '')}
+          placeholder="Defaults to Target Value if empty"
+          className="form-input"
         />
       </div>
 
       <div className="mb-6">
-        <label className="block text-sm font-bold mb-2 dark:text-gray-300">Days of Week</label>
+        <label className="form-label">Days of Week</label>
         <div className="flex flex-wrap gap-2 mb-3">
           <button
             type="button"
             onClick={selectAllDays}
-            className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors text-sm dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800"
+            className="badge badge-accent !cursor-pointer hover:opacity-80 transition-opacity"
           >
             Select All
           </button>
           <button
             type="button"
             onClick={unselectAllDays}
-            className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+            className="badge badge-info !cursor-pointer hover:opacity-80 transition-opacity"
           >
             Unselect All
           </button>
           <button
             type="button"
             onClick={selectWorkWeek}
-            className="px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors text-sm dark:bg-green-900 dark:text-green-200 dark:hover:bg-green-800"
+            className="badge badge-success !cursor-pointer hover:opacity-80 transition-opacity"
           >
             Select Work Week
           </button>
         </div>
         <div className="grid grid-cols-7 gap-2">
           {['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'].map(day => (
-            <label key={day} className="flex items-center space-x-1 dark:text-gray-300">
+            <label key={day} className="flex items-center space-x-1 text-[var(--text-secondary)]">
               <input
                 type="checkbox"
                 checked={daysOfWeek.includes(day)}
                 onChange={() => toggleDay(day)}
-                className="form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                className="mr-1 rounded focus:ring-2 focus:ring-[var(--accent)] accent-[var(--accent)]"
               />
               <span className="text-sm">{day.substring(0, 3)}</span>
             </label>
@@ -198,21 +236,21 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
             type="checkbox"
             checked={isActive}
             onChange={(e) => setIsActive(e.target.checked)}
-            className="form-checkbox h-4 w-4 text-blue-600 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+            className="mr-2 rounded focus:ring-2 focus:ring-[var(--accent)] accent-[var(--accent)]"
           />
-          <span className="ml-2 dark:text-gray-300">Active Goal</span>
+          <span className="ml-2 text-[var(--text-secondary)]">Active Goal</span>
         </label>
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-bold mb-2 dark:text-gray-300" htmlFor="description">
+        <label className="form-label" htmlFor="description">
           Description
         </label>
         <textarea
             id="description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+            className="form-input"
             rows={3}
         />
       </div>
@@ -220,13 +258,13 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+          className="btn btn-secondary"
         >
           Cancel
         </button>
         <button
           type="submit"
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+          className="btn btn-primary"
         >
           Update Goal
         </button>

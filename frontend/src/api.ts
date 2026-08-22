@@ -53,3 +53,19 @@ export async function apiSend<T>(
   });
   return parseResponse<T>(response);
 }
+
+export async function addTargetHistory(goalId: number, validFrom: string, value: number, validTo?: string | null, period: string = 'WEEK') {
+  const params = new URLSearchParams({ validFrom, value: String(value), period });
+  if (validTo) params.set('validTo', validTo);
+  return apiSend<unknown>(`/api/goals/${goalId}/target?${params.toString()}`, 'POST');
+}
+
+export async function updateTargetHistory(goalId: number, historyId: number, validFrom: string, value: number, validTo?: string | null, period: string = 'WEEK') {
+  const params = new URLSearchParams({ validFrom, value: String(value), period });
+  if (validTo) params.set('validTo', validTo);
+  return apiSend<unknown>(`/api/goals/${goalId}/target/${historyId}?${params.toString()}`, 'PUT');
+}
+
+export async function deleteTargetHistory(goalId: number, historyId: number) {
+  return apiSend<void>(`/api/goals/${goalId}/target/${historyId}`, 'DELETE');
+}

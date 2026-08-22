@@ -16,15 +16,23 @@ import type { ChartDataResponse } from '../types';
 
 interface ChartViewProps {
   data: ChartDataResponse[];
+  isDarkMode: boolean;
 }
 
-const ChartView: React.FC<ChartViewProps> = ({ data }) => {
+const getLabel = (entry: ChartDataResponse): string => entry.entryDate ?? entry.weekStart ?? '';
+
+const ChartView: React.FC<ChartViewProps> = ({ data, isDarkMode }) => {
+  const tooltipBg = isDarkMode ? '#1f2937' : '#ffffff';
+  const tooltipBorder = isDarkMode ? '#374151' : '#e2e8f0';
+  const tooltipText = isDarkMode ? '#f9fafb' : '#0f172a';
+  const gridClassName = isDarkMode ? 'dark:stroke-gray-700' : 'stroke-slate-200';
+  const axisClassName = isDarkMode ? 'dark:fill-gray-300' : 'fill-slate-500';
   // Transform data for line chart - flatten the goals object into individual fields
   const lineChartData = data
     .slice()
-    .sort((a, b) => new Date(a.weekStart).getTime() - new Date(b.weekStart).getTime())
+    .sort((a, b) => new Date(getLabel(a)).getTime() - new Date(getLabel(b)).getTime())
     .map(entry => {
-      const flat: Record<string, number | string> = { weekStart: entry.weekStart };
+      const flat: Record<string, number | string> = { label: getLabel(entry) };
       // daily progress per goal (top-level key goal_<id>)
       for (const [k, v] of Object.entries(entry.goals)) flat[k] = v;
       // cumulative total progress per goal (top-level key total_<id>)
@@ -40,26 +48,26 @@ const ChartView: React.FC<ChartViewProps> = ({ data }) => {
   // Prepare data for bar chart using the first available goal
   const firstGoalKey = allGoalKeys[0];
   const barChartData = lineChartData.map(entry => ({
-    name: entry.weekStart,
+    name: entry.label,
     progress: firstGoalKey ? (entry[firstGoalKey] ?? 0) : 0,
     totalProgress: firstGoalKey ? (entry[`total_${firstGoalKey.replace('goal_', '')}`] ?? 0) : 0
   }));
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="rounded-lg shadow-md p-6 dark:bg-gray-800">
-        <h3 className="text-lg font-semibold mb-4 dark:text-white">Progress Over Time</h3>
+      <div className="surface !mb-0 rounded-xl p-6">
+        <h3 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">Progress Over Time</h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart
             data={lineChartData}
             margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" className="dark:stroke-gray-700" />
-            <XAxis dataKey="weekStart" className="dark:fill-gray-300" />
-            <YAxis className="dark:fill-gray-300" />
+            <CartesianGrid strokeDasharray="3 3" className={gridClassName} />
+            <XAxis dataKey="label" className={axisClassName} />
+            <YAxis className={axisClassName} />
             <Tooltip
-              contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151' }}
-              itemStyle={{ color: '#f9fafb' }}
+              contentStyle={{ backgroundColor: tooltipBg, borderColor: tooltipBorder }}
+              itemStyle={{ color: tooltipText }}
             />
             <Legend />
             {allGoalKeys.map((key) => {
@@ -87,19 +95,19 @@ const ChartView: React.FC<ChartViewProps> = ({ data }) => {
         </ResponsiveContainer>
       </div>
 
-      <div className="rounded-lg shadow-md p-6 dark:bg-gray-800">
-        <h3 className="text-lg font-semibold mb-4 dark:text-white">Weekly Progress Comparison</h3>
+      <div className="surface !mb-0 rounded-xl p-6">
+        <h3 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">Period Progress Comparison</h3>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart
             data={barChartData}
             margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" className="dark:stroke-gray-700" />
-            <XAxis dataKey="name" className="dark:fill-gray-300" />
-            <YAxis className="dark:fill-gray-300" />
+            <CartesianGrid strokeDasharray="3 3" className={gridClassName} />
+            <XAxis dataKey="name" className={axisClassName} />
+            <YAxis className={axisClassName} />
             <Tooltip
-              contentStyle={{ backgroundColor: '#1f2937', borderColor: '#374151' }}
-              itemStyle={{ color: '#f9fafb' }}
+              contentStyle={{ backgroundColor: tooltipBg, borderColor: tooltipBorder }}
+              itemStyle={{ color: tooltipText }}
             />
             <Legend />
             <Bar dataKey="progress" fill="#10b981" name="Progress (%)" />

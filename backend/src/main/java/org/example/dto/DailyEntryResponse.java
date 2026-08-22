@@ -3,10 +3,10 @@ package org.example.dto;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-public record WeeklyEntryResponse(
+public record DailyEntryResponse(
     Long id,
     Long goalId,
-    LocalDate weekStartDate,
+    LocalDate entryDate,
     BigDecimal actualValue,
     BigDecimal targetValue
 ) {}

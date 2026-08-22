@@ -1,87 +1,103 @@
 package org.example.service;
 
-import org.example.entity.WeeklyEntry;
+import org.example.entity.DailyEntry;
+import org.example.entity.Goal;
 import org.example.repository.GoalRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class ChartDataService {
 
     @Autowired
-    private WeeklyEntryService weeklyEntryService;
+    private DailyEntryService dailyEntryService;
 
     @Autowired
     private GoalRepository goalRepository;
 
-    public List<Map<String, Object>> getChartDataForAllGoals() {
-        List<WeeklyEntry> allEntries = weeklyEntryService.getAllEntries();
-        allEntries.sort(Comparator.comparing(WeeklyEntry::getWeekStartDate));
+    @Autowired
+    private GoalService goalService;
 
-        // Fixed target value per goal (cumulative progress is measured against the goal's target)
+    public List<Map<String, Object>> getChartDataForAllGoals(String range, LocalDate anchor) {
+        List<DailyEntry> allEntries = dailyEntryService.getAllEntries();
+        return buildSeries(allEntries, null, range, anchor);
+    }
+
+    public List<Map<String, Object>> getChartDataForGoal(Long goalId, String range, LocalDate anchor) {
+        List<DailyEntry> entries = dailyEntryService.getEntriesByGoalId(goalId);
+        return buildSeries(entries, goalId, range, anchor);
+    }
+
+    private List<Map<String, Object>> buildSeries(List<DailyEntry> entries, Long singleGoalId, String range, LocalDate anchor) {
+        LocalDate anchorDate = anchor != null ? anchor : LocalDate.now();
+        LocalDate from = resolveFrom(range, anchorDate);
+        LocalDate to = anchorDate;
+
         Map<Long, Double> goalTargets = new HashMap<>();
         goalRepository.findAll().forEach(g -> goalTargets.put(g.getId(), g.getTargetValue().doubleValue()));
+
+        boolean weekly = "week".equalsIgnoreCase(range);
 
         Map<LocalDate, Map<String, Object>> groupedData = new LinkedHashMap<>();
         Map<Long, Double> runningActual = new HashMap<>();
 
-        for (WeeklyEntry entry : allEntries) {
-            LocalDate weekStart = entry.getWeekStartDate();
-            groupedData.putIfAbsent(weekStart, new HashMap<>());
-            Map<String, Object> weekData = groupedData.get(weekStart);
+        List<DailyEntry> filtered = entries.stream()
+                .filter(e -> !e.getEntryDate().isAfter(to))
+                .filter(e -> from == null || !e.getEntryDate().isBefore(from))
+                .sorted(Comparator.comparing(DailyEntry::getEntryDate))
+                .collect(Collectors.toList());
+
+        for (DailyEntry entry : filtered) {
+            LocalDate bucket = weekly ? startOfWeek(entry.getEntryDate()) : entry.getEntryDate();
+            groupedData.putIfAbsent(bucket, new LinkedHashMap<>());
+            Map<String, Object> bucketData = groupedData.get(bucket);
 
             long id = entry.getGoalId();
             double target = goalTargets.getOrDefault(id, 0.0);
             runningActual.merge(id, entry.getActualValue().doubleValue(), Double::sum);
 
             String goalKey = "goal_" + id;
-            weekData.put(goalKey, calculatePercentage(entry));
+            bucketData.put(goalKey, calculatePercentage(entry));
 
             double totalProgress = (target == 0.0) ? 0.0 :
                     (runningActual.get(id) / target) * 100.0;
-            weekData.put("total_" + id, totalProgress);
+            bucketData.put("total_" + id, totalProgress);
 
-            weekData.put("weekStart", weekStart.toString());
+            double effective = goalService.getEffectiveTarget(id, entry.getEntryDate()).doubleValue();
+            bucketData.put("target_" + id, effective);
+
+            bucketData.put(weekly ? "weekStart" : "entryDate", bucket.toString());
         }
 
         return new ArrayList<>(groupedData.values());
     }
 
-    public List<Map<String, Object>> getChartDataForGoal(Long goalId) {
-        List<WeeklyEntry> entries = weeklyEntryService.getEntriesByGoalId(goalId);
-        entries.sort(Comparator.comparing(WeeklyEntry::getWeekStartDate));
-
-        double goalTarget = goalRepository.findById(goalId)
-                .map(g -> g.getTargetValue().doubleValue())
-                .orElse(0.0);
-
-        Map<LocalDate, Map<String, Object>> groupedData = new LinkedHashMap<>();
-        double runningActual = 0.0;
-
-        for (WeeklyEntry entry : entries) {
-            LocalDate weekStart = entry.getWeekStartDate();
-            groupedData.putIfAbsent(weekStart, new HashMap<>());
-            Map<String, Object> weekData = groupedData.get(weekStart);
-
-            runningActual += entry.getActualValue().doubleValue();
-
-            String goalKey = "goal_" + goalId;
-            weekData.put("weekStart", weekStart.toString());
-            weekData.put(goalKey, calculatePercentage(entry));
-
-            double totalProgress = (goalTarget == 0.0) ? 0.0 :
-                    (runningActual / goalTarget) * 100.0;
-            weekData.put("total_" + goalId, totalProgress);
+    private LocalDate resolveFrom(String range, LocalDate anchor) {
+        if (range == null) return null;
+        switch (range.toLowerCase()) {
+            case "7d":
+                return anchor.minusDays(6);
+            case "30d":
+                return anchor.minusDays(29);
+            case "week":
+                return startOfWeek(anchor);
+            case "all":
+            default:
+                return null;
         }
-
-        return new ArrayList<>(groupedData.values());
     }
 
-    private double calculatePercentage(WeeklyEntry entry) {
+    private LocalDate startOfWeek(LocalDate date) {
+        return date.with(DayOfWeek.MONDAY);
+    }
+
+    private double calculatePercentage(DailyEntry entry) {
         if (entry.getTargetValue().compareTo(BigDecimal.ZERO) == 0) {
             return 0.0;
         }

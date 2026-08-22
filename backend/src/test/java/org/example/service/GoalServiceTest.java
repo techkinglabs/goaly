@@ -2,6 +2,7 @@ package org.example.service;
 
 import org.example.entity.Goal;
 import org.example.repository.GoalRepository;
+import org.example.repository.TargetHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -19,6 +20,9 @@ class GoalServiceTest {
     @Mock
     private GoalRepository goalRepository;
 
+    @Mock
+    private TargetHistoryRepository targetHistoryRepository;
+
     @InjectMocks
     private GoalService goalService;
 
@@ -34,6 +38,7 @@ class GoalServiceTest {
         goal.setName("Sleep at 23:00");
         goal.setUnit("hours");
         goal.setTargetValue(new BigDecimal("8"));
+        goal.setAmountPerPeriod(new BigDecimal("8"));
 
         when(goalRepository.save(goal)).thenReturn(goal);
 
@@ -42,7 +47,8 @@ class GoalServiceTest {
 
         // Then
         assertEquals(goal, result);
-        verify(goalRepository).save(goal);
+        verify(goalRepository, times(2)).save(goal);
+        verify(targetHistoryRepository).save(argThat(h -> h.getValue().compareTo(new BigDecimal("8")) == 0));
     }
 
     @Test

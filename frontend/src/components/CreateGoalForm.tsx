@@ -8,6 +8,9 @@ interface CreateGoalFormProps {
         isActive: boolean;
         description?: string;
         daysOfWeek?: string[];
+        period?: string;
+        amountPerPeriod?: number;
+        initialTargetValue?: number;
     }) => void;
 }
 
@@ -20,6 +23,8 @@ const CreateGoalForm: React.FC<CreateGoalFormProps> = ({ onSubmit }) => {
     const [isActive, setIsActive] = useState(true);
     const [description, setDescription] = useState('');
     const [daysOfWeek, setDaysOfWeek] = useState<string[]>([]);
+    const [period, setPeriod] = useState('ONGOING');
+    const [amountPerPeriod, setAmountPerPeriod] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -29,13 +34,18 @@ const CreateGoalForm: React.FC<CreateGoalFormProps> = ({ onSubmit }) => {
             finalUnit = customUnit;
         }
 
+        const amount = amountPerPeriod.trim() !== '' ? Number(amountPerPeriod) : Number(targetValue);
+
         onSubmit({
             name,
             unit: finalUnit,
             targetValue: Number(targetValue),
             isActive,
             description,
-            daysOfWeek
+            daysOfWeek,
+            period,
+            amountPerPeriod: amount,
+            initialTargetValue: Number(targetValue)
         });
 
         setName('');
@@ -46,6 +56,8 @@ const CreateGoalForm: React.FC<CreateGoalFormProps> = ({ onSubmit }) => {
         setIsActive(true);
         setDescription('');
         setDaysOfWeek([]);
+        setPeriod('ONGOING');
+        setAmountPerPeriod('');
     };
 
     const toggleDay = (day: string) => {
@@ -71,12 +83,12 @@ const CreateGoalForm: React.FC<CreateGoalFormProps> = ({ onSubmit }) => {
     return (
         <form
             onSubmit={handleSubmit}
-            className="rounded-lg shadow-md p-6 w-full max-w-md dark:bg-gray-800"
+            className="surface !mb-0 rounded-xl p-6 w-full max-w-md border border-[var(--border)]"
         >
-            <h3 className="text-lg font-semibold mb-4 dark:text-white">Create New Goal</h3>
+            <h3 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">Create New Goal</h3>
 
             <div className="mb-4">
-                <label className="block text-sm font-medium mb-1 dark:text-gray-300">
+                <label className="form-label">
                     Name
                 </label>
 
@@ -84,13 +96,13 @@ const CreateGoalForm: React.FC<CreateGoalFormProps> = ({ onSubmit }) => {
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+                    className="form-input"
                     required
                 />
             </div>
 
             <div className="mb-4">
-                <label className="block text-sm font-medium mb-1 dark:text-gray-300">
+                <label className="form-label">
                     Unit
                 </label>
 
@@ -105,7 +117,7 @@ const CreateGoalForm: React.FC<CreateGoalFormProps> = ({ onSubmit }) => {
                             setUnit(e.target.value);
                         }
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+                    className="form-input"
                     required
                 >
                     <option value="">Select a unit</option>
@@ -124,15 +136,15 @@ const CreateGoalForm: React.FC<CreateGoalFormProps> = ({ onSubmit }) => {
                         value={customUnit}
                         onChange={(e) => setCustomUnit(e.target.value)}
                         placeholder="Enter custom unit"
-                        className="mt-2 w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+                        className="mt-2 form-input"
                         required
                     />
                 )}
             </div>
 
             <div className="mb-4">
-                <label className="block text-sm font-medium mb-1 dark:text-gray-300">
-                    Target Value
+                <label className="form-label">
+                    Target Value (initial / current)
                 </label>
 
                 <input
@@ -140,13 +152,45 @@ const CreateGoalForm: React.FC<CreateGoalFormProps> = ({ onSubmit }) => {
                     step="0.01"
                     value={targetValue}
                     onChange={(e) => setTargetValue(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+                    className="form-input"
                     required
                 />
             </div>
 
             <div className="mb-4">
-                <label className="block text-sm font-medium mb-1 dark:text-gray-300">
+                <label className="form-label">
+                    Period
+                </label>
+
+                <select
+                    value={period}
+                    onChange={(e) => setPeriod(e.target.value)}
+                    className="form-input"
+                >
+                    <option value="ONGOING">Ongoing (forever)</option>
+                    <option value="WEEK">Per Week</option>
+                    <option value="MONTH">Per Month</option>
+                    <option value="YEAR">Per Year</option>
+                </select>
+            </div>
+
+            <div className="mb-4">
+                <label className="form-label">
+                    Amount per Period
+                </label>
+
+                <input
+                    type="number"
+                    step="0.01"
+                    value={amountPerPeriod}
+                    onChange={(e) => setAmountPerPeriod(e.target.value)}
+                    placeholder="Defaults to Target Value if empty"
+                    className="form-input"
+                />
+            </div>
+
+            <div className="mb-4">
+                <label className="form-label">
                     Days of Week
                 </label>
                 
@@ -154,21 +198,21 @@ const CreateGoalForm: React.FC<CreateGoalFormProps> = ({ onSubmit }) => {
                     <button
                         type="button"
                         onClick={selectAllDays}
-                        className="px-3 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors text-sm dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800"
+                        className="badge badge-accent !cursor-pointer hover:opacity-80 transition-opacity"
                     >
                         Select All
                     </button>
                     <button
                         type="button"
                         onClick={unselectAllDays}
-                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors text-sm dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                        className="badge badge-info !cursor-pointer hover:opacity-80 transition-opacity"
                     >
                         Unselect All
                     </button>
                     <button
                         type="button"
                         onClick={selectWorkWeek}
-                        className="px-3 py-1 bg-green-100 text-green-700 rounded-md hover:bg-green-200 transition-colors text-sm dark:bg-green-900 dark:text-green-200 dark:hover:bg-green-800"
+                        className="badge badge-success !cursor-pointer hover:opacity-80 transition-opacity"
                     >
                         Select Work Week
                     </button>
@@ -176,12 +220,12 @@ const CreateGoalForm: React.FC<CreateGoalFormProps> = ({ onSubmit }) => {
                 
                 <div className="grid grid-cols-7 gap-2">
                     {['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'].map(day => (
-                        <label key={day} className="flex items-center space-x-1 dark:text-gray-300">
+                        <label key={day} className="flex items-center space-x-1 text-[var(--text-secondary)]">
                             <input
                                 type="checkbox"
                                 checked={daysOfWeek.includes(day)}
                                 onChange={() => toggleDay(day)}
-                                className="mr-1 rounded dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500"
+                                className="mr-1 rounded focus:ring-2 focus:ring-[var(--accent)] accent-[var(--accent)]"
                             />
                             <span className="text-sm">{day.substring(0, 3)}</span>
                         </label>
@@ -195,24 +239,24 @@ const CreateGoalForm: React.FC<CreateGoalFormProps> = ({ onSubmit }) => {
                         type="checkbox"
                         checked={isActive}
                         onChange={(e) => setIsActive(e.target.checked)}
-                        className="mr-2 rounded dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500"
+                        className="mr-2 rounded focus:ring-2 focus:ring-[var(--accent)] accent-[var(--accent)]"
                     />
 
-                    <span className="text-sm dark:text-gray-300">
+                    <span className="text-sm text-[var(--text-secondary)]">
             Active Goal
           </span>
                 </label>
             </div>
 
             <div className="mb-4">
-                <label className="block text-sm font-medium mb-1 dark:text-gray-300">
+                <label className="form-label">
                     Description
                 </label>
 
                 <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-blue-500 focus:border-blue-500"
+                    className="form-input"
                     rows={3}
                 />
             </div>
@@ -220,7 +264,7 @@ const CreateGoalForm: React.FC<CreateGoalFormProps> = ({ onSubmit }) => {
 
             <button
                 type="submit"
-                className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                className="btn btn-primary w-full"
             >
                 Create Goal
             </button>

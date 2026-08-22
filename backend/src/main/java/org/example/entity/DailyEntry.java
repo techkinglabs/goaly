@@ -1,7 +1,6 @@
 package org.example.entity;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -11,14 +10,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "weekly_entries", uniqueConstraints = @UniqueConstraint(
-        name = "uk_weekly_entry_goal_week",
-        columnNames = {"goal_id", "week_start_date"}
+@Table(name = "daily_entries", uniqueConstraints = @UniqueConstraint(
+        name = "uk_daily_entry_goal_date",
+        columnNames = {"goal_id", "entry_date"}
 ))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class WeeklyEntry {
+public class DailyEntry {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -27,9 +26,9 @@ public class WeeklyEntry {
     @NotNull(message = "Goal ID is required")
     private Long goalId;
 
-    @Column(name = "week_start_date", nullable = false)
-    @NotNull(message = "Week start date is required")
-    private LocalDate weekStartDate;
+    @Column(name = "entry_date", nullable = false)
+    @NotNull(message = "Entry date is required")
+    private LocalDate entryDate;
 
     @Column(name = "actual_value", nullable = false)
     @NotNull(message = "Actual value is required")

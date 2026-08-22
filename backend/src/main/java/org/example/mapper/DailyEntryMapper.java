@@ -1,35 +1,35 @@
 package org.example.mapper;
 
-import org.example.dto.WeeklyEntryResponse;
-import org.example.dto.WeeklyEntryRequest;
-import org.example.entity.WeeklyEntry;
+import org.example.dto.DailyEntryResponse;
+import org.example.dto.DailyEntryRequest;
+import org.example.entity.DailyEntry;
 
-public class WeeklyEntryMapper {
-    public static WeeklyEntryResponse toResponse(WeeklyEntry entry) {
+public class DailyEntryMapper {
+    public static DailyEntryResponse toResponse(DailyEntry entry) {
         if (entry == null) return null;
-        return new WeeklyEntryResponse(
+        return new DailyEntryResponse(
             entry.getId(),
             entry.getGoalId(),
-            entry.getWeekStartDate(),
+            entry.getEntryDate(),
             entry.getActualValue(),
             entry.getTargetValue()
         );
     }
 
-    public static WeeklyEntry toEntity(WeeklyEntryRequest request) {
+    public static DailyEntry toEntity(DailyEntryRequest request) {
         if (request == null) return null;
-        WeeklyEntry entry = new WeeklyEntry();
+        DailyEntry entry = new DailyEntry();
         entry.setGoalId(request.goalId());
-        entry.setWeekStartDate(request.weekStartDate());
+        entry.setEntryDate(request.entryDate());
         entry.setActualValue(request.actualValue());
         entry.setTargetValue(request.targetValue());
         return entry;
     }
 
-    public static void updateEntityFromRequest(WeeklyEntryRequest request, WeeklyEntry entry) {
+    public static void updateEntityFromRequest(DailyEntryRequest request, DailyEntry entry) {
         if (request == null || entry == null) return;
         entry.setGoalId(request.goalId());
-        entry.setWeekStartDate(request.weekStartDate());
+        entry.setEntryDate(request.entryDate());
         entry.setActualValue(request.actualValue());
         entry.setTargetValue(request.targetValue());
     }

@@ -1,5 +1,6 @@
 package org.example.controller;
 
+import org.example.exception.DuplicateDayException;
 import org.example.exception.DuplicateWeekException;
 import org.example.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,12 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", "Conflict", "message", ex.getMessage()));
     }
 
+    @ExceptionHandler(DuplicateDayException.class)
+    public ResponseEntity<Map<String, Object>> handleDuplicateDay(DuplicateDayException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("error", "Conflict", "message", ex.getMessage()));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -34,6 +41,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("error", "Internal Server Error",
-                        "message", "An unexpected error occurred. Please contact support."));
+                        "message", ex.getMessage()));
     }
 }

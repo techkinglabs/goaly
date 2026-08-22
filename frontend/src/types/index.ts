@@ -1,3 +1,12 @@
+export interface TargetHistoryEntry {
+  id: number;
+  goalId: number;
+  validFrom: string;
+  validTo?: string | null;
+  value: number;
+  period?: 'DAY' | 'WEEK' | 'MONTH' | 'YEAR';
+}
+
 export interface Goal {
   id: number;
   name: string;
@@ -6,18 +15,22 @@ export interface Goal {
   isActive: boolean;
   description?: string;
   daysOfWeek?: string[];
+  period?: 'YEAR' | 'MONTH' | 'WEEK' | 'ONGOING';
+  amountPerPeriod?: number;
+  targetHistory?: TargetHistoryEntry[];
 }
 
-export interface WeeklyEntry {
+export interface DailyEntry {
   id: number;
   goalId: number;
-  weekStartDate: string;
+  entryDate: string;
   actualValue: number;
   targetValue: number;
 }
 
 export interface ChartDataResponse {
-  weekStart: string;
+  weekStart?: string;
+  entryDate?: string;
   goals: Record<string, number>;
   totals: Record<string, number>;
 }

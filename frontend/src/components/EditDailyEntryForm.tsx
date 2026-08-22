@@ -1,28 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import type { WeeklyEntry } from '../types';
+import type { DailyEntry } from '../types';
 
-interface EditWeeklyEntryFormProps {
-  entry?: WeeklyEntry;
+interface EditDailyEntryFormProps {
+  entry?: DailyEntry;
   goals: {id: number; name: string}[];
-  onSubmit: (entryData: Omit<WeeklyEntry, 'id'>) => void;
+  onSubmit: (entryData: Omit<DailyEntry, 'id'>) => void;
   onCancel: () => void;
 }
 
-const EditWeeklyEntryForm: React.FC<EditWeeklyEntryFormProps> = ({ 
-  entry, 
+const EditDailyEntryForm: React.FC<EditDailyEntryFormProps> = ({
+  entry,
   goals,
-  onSubmit, 
-  onCancel 
+  onSubmit,
+  onCancel
 }) => {
   const [selectedGoalId, setSelectedGoalId] = useState<number | ''>('');
-  const [weekStartDate, setWeekStartDate] = useState('');
+  const [entryDate, setEntryDate] = useState('');
   const [actualValue, setActualValue] = useState<number | ''>('');
   const [targetValue, setTargetValue] = useState<number | ''>('');
 
   useEffect(() => {
     if (entry) {
       setSelectedGoalId(entry.goalId);
-      setWeekStartDate(entry.weekStartDate);
+      setEntryDate(entry.entryDate);
       setActualValue(entry.actualValue);
       setTargetValue(entry.targetValue);
     }
@@ -30,33 +30,33 @@ const EditWeeklyEntryForm: React.FC<EditWeeklyEntryFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!selectedGoalId || !weekStartDate || actualValue === '') {
+
+    if (!selectedGoalId || !entryDate || actualValue === '') {
       alert('Please fill in all required fields');
       return;
     }
 
     onSubmit({
       goalId: Number(selectedGoalId),
-      weekStartDate,
+      entryDate,
       actualValue: Number(actualValue),
       targetValue: Number(targetValue)
     });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-6 rounded-lg shadow-md mb-6 dark:bg-gray-800">
-      <h3 className="text-lg font-semibold mb-4 dark:text-white">Edit Weekly Entry</h3>
-      
+    <form onSubmit={handleSubmit} className="surface !mb-0 rounded-xl p-6">
+      <h3 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">Edit Daily Entry</h3>
+
       <div className="mb-4">
-        <label className="block text-sm font-bold mb-2 dark:text-gray-300" htmlFor="goalId">
+        <label className="form-label" htmlFor="goalId">
           Goal
         </label>
         <select
           id="goalId"
           value={selectedGoalId}
           onChange={(e) => setSelectedGoalId(e.target.value ? Number(e.target.value) : '')}
-          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:text-white dark:border-gray-600"
+          className="form-input"
           required
         >
           <option value="">Select a goal</option>
@@ -67,21 +67,21 @@ const EditWeeklyEntryForm: React.FC<EditWeeklyEntryFormProps> = ({
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-bold mb-2 dark:text-gray-300" htmlFor="weekStartDate">
-          Week Starting
+        <label className="form-label" htmlFor="entryDate">
+          Entry Date
         </label>
         <input
-          id="weekStartDate"
+          id="entryDate"
           type="date"
-          value={weekStartDate}
-          onChange={(e) => setWeekStartDate(e.target.value)}
-          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:text-white dark:border-gray-600"
+          value={entryDate}
+          onChange={(e) => setEntryDate(e.target.value)}
+          className="form-input"
           required
         />
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-bold mb-2 dark:text-gray-300" htmlFor="actualValue">
+        <label className="form-label" htmlFor="actualValue">
           Actual Value
         </label>
         <input
@@ -90,13 +90,13 @@ const EditWeeklyEntryForm: React.FC<EditWeeklyEntryFormProps> = ({
           step="0.01"
           value={actualValue}
           onChange={(e) => setActualValue(e.target.value ? Number(e.target.value) : '')}
-          className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:text-white dark:border-gray-600"
+          className="form-input"
           required
         />
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-bold mb-2 dark:text-gray-300" htmlFor="targetValue">
+        <label className="form-label" htmlFor="targetValue">
           Target Value
         </label>
           <input
@@ -106,7 +106,7 @@ const EditWeeklyEntryForm: React.FC<EditWeeklyEntryFormProps> = ({
             value={targetValue}
             onChange={(e) => setTargetValue(e.target.value ? Number(e.target.value) : '')}
             readOnly
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline dark:bg-gray-700 dark:text-white dark:border-gray-600 opacity-70 cursor-not-allowed"
+            className="form-input opacity-70 cursor-not-allowed"
             required
           />
       </div>
@@ -115,13 +115,13 @@ const EditWeeklyEntryForm: React.FC<EditWeeklyEntryFormProps> = ({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors dark:bg-gray-600 dark:text-white dark:hover:bg-gray-500"
+          className="btn btn-secondary"
         >
           Cancel
         </button>
         <button
           type="submit"
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          className="btn btn-primary"
         >
           Update Entry
         </button>
@@ -130,4 +130,4 @@ const EditWeeklyEntryForm: React.FC<EditWeeklyEntryFormProps> = ({
   );
 };
 
-export default EditWeeklyEntryForm;
+export default EditDailyEntryForm;

@@ -3,3 +3,4 @@
 - ensure that DB connection is correct
 - if you change backend ensure that is possible to build without errors
 - if you change frontend ensure that is possible to build without errors
+- NODE js, its in docker file

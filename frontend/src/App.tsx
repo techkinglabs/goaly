@@ -1,29 +1,47 @@
 import React, { useState, useEffect } from 'react';
 import GoalList from './components/GoalList';
-import WeeklyEntryList from './components/WeeklyEntryList';
+import DailyEntryList from './components/DailyEntryList';
 import ChartView from './components/ChartView';
 import CreateGoalForm from './components/CreateGoalForm';
 import EditGoalForm from './components/EditGoalForm';
-import CreateWeeklyEntryForm from './components/CreateWeeklyEntryForm';
-import EditWeeklyEntryForm from './components/EditWeeklyEntryForm';
+import CreateDailyEntryForm from './components/CreateDailyEntryForm';
+import EditDailyEntryForm from './components/EditDailyEntryForm';
 import GoalDetail from './components/GoalDetail';
 import { apiGet, apiSend, ApiError } from './api';
-import type { Goal, WeeklyEntry, ChartDataResponse } from './types';
+import type { Goal, DailyEntry, ChartDataResponse } from './types';
 
 function App() {
   const [activeTab, setActiveTab] = useState<string>('goals');
   const [goals, setGoals] = useState<Goal[]>([]);
-  const [entries, setEntries] = useState<WeeklyEntry[]>([]);
+  const [entries, setEntries] = useState<DailyEntry[]>([]);
   const [chartData, setChartData] = useState<ChartDataResponse[]>([]);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
-  const [editingEntry, setEditingEntry] = useState<WeeklyEntry | null>(null);
+  const [editingEntry, setEditingEntry] = useState<DailyEntry | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true); // Default to dark mode
   const [showCreateGoalModal, setShowCreateGoalModal] = useState(false);
   const [error, setError] = useState<string | null>(null); // Global error state
   const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null); // For Jira-style detail view
 
+  const [chartRange, setChartRange] = useState<string>('all');
+  const [chartAnchor, setChartAnchor] = useState<string>(new Date().toISOString().split('T')[0]);
+
   const selectedGoal = goals.find((g) => g.id === selectedGoalId) ?? null;
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
+  }, [isDarkMode]);
+
+  const refreshChart = async (range: string, anchor: string) => {
+    try {
+      const params = new URLSearchParams({ range });
+      if (anchor) params.set('anchor', anchor);
+      const fetchedChartData = await apiGet<ChartDataResponse[]>(`/api/chart/data?${params.toString()}`);
+      setChartData(fetchedChartData);
+    } catch (err) {
+      console.error('Error loading chart data:', err);
+    }
+  };
 
   // Load data from API
   useEffect(() => {
@@ -37,7 +55,7 @@ function App() {
           setSelectedGoalId(fetchedGoals[0].id);
         }
 
-        const fetchedEntries = await apiGet<WeeklyEntry[]>('/api/entries');
+        const fetchedEntries = await apiGet<DailyEntry[]>('/api/entries');
         setEntries(fetchedEntries);
 
         const fetchedChartData = await apiGet<ChartDataResponse[]>('/api/chart/data');
@@ -85,7 +103,9 @@ function App() {
       targetValue: updatedGoal.targetValue,
       isActive: updatedGoal.isActive,
       description: updatedGoal.description,
-      daysOfWeek: updatedGoal.daysOfWeek
+      daysOfWeek: updatedGoal.daysOfWeek,
+      period: updatedGoal.period,
+      amountPerPeriod: updatedGoal.amountPerPeriod
     };
 
     try {
@@ -114,6 +134,7 @@ function App() {
 
       setGoals((prev) => prev.filter((goal) => goal.id !== id));
       setSelectedGoalId((prev) => (prev === id ? null : prev));
+      setEditingGoal((prev) => (prev?.id === id ? null : prev));
     } catch (err) {
       console.error('Error deleting goal:', err);
       setError(err instanceof ApiError ? `Failed to delete goal: ${err.message}` : 'Failed to delete goal. Please try again.');
@@ -130,11 +151,11 @@ function App() {
 
   const handleEntrySubmit = async (entryData: {
     goalId: number;
-    weekStartDate: string;
+    entryDate: string;
     actualValue: number;
   }) => {
     try {
-      const savedEntry: WeeklyEntry = await apiSend<WeeklyEntry>('/api/entries', 'POST', entryData);
+      const savedEntry: DailyEntry = await apiSend<DailyEntry>('/api/entries', 'POST', entryData);
       setEntries((prev) => [...prev, savedEntry]);
     } catch (err) {
       console.error('Error creating entry:', err);
@@ -142,13 +163,23 @@ function App() {
     }
   };
 
-  const handleEntryEdit = async (updatedEntry: Omit<WeeklyEntry, 'id'>) => {
+  const handleEntryEdit = async (updatedEntry: Omit<DailyEntry, 'id'>) => {
     if (!editingEntry) return;
 
     try {
-      const savedEntry: WeeklyEntry = await apiSend<WeeklyEntry>(`/api/entries/${editingEntry.id}`, 'PUT', updatedEntry);
+      const savedEntry: DailyEntry = await apiSend<DailyEntry>(`/api/entries/${editingEntry.id}`, 'PUT', updatedEntry);
       setEntries((prev) => prev.map((entry) => (entry.id === savedEntry.id ? savedEntry : entry)));
       setEditingEntry(null); // Close edit form
+    } catch (err) {
+      console.error('Error updating entry:', err);
+      setError(err instanceof ApiError ? `Failed to update entry: ${err.message}` : 'Failed to update entry. Please try again.');
+    }
+  };
+
+  const handleInlineEntryUpdate = async (id: number, updates: { goalId: number; entryDate: string; actualValue: number; targetValue: number }) => {
+    try {
+      const savedEntry: DailyEntry = await apiSend<DailyEntry>(`/api/entries/${id}`, 'PUT', updates);
+      setEntries((prev) => prev.map((entry) => (entry.id === savedEntry.id ? savedEntry : entry)));
     } catch (err) {
       console.error('Error updating entry:', err);
       setError(err instanceof ApiError ? `Failed to update entry: ${err.message}` : 'Failed to update entry. Please try again.');
@@ -183,14 +214,14 @@ function App() {
   };
 
   return (
-    <div className={isDarkMode ? 'dark min-h-screen bg-gray-900' : 'min-h-screen bg-gray-50'}>
-      <header className={isDarkMode ? 'bg-gray-800 text-white p-4 shadow-md' : 'bg-blue-600 text-white p-4 shadow-md'}>
-        <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Weekly Progress Tracker</h1>
+    <div className={isDarkMode ? 'dark min-h-screen' : 'min-h-screen'}>
+      <header className="header">
+        <div className="container-app flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Personal Progress Tracker</h1>
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`p-2 rounded-full ${isDarkMode ? 'bg-gray-700 text-yellow-300' : 'bg-blue-500 text-white'}`}
+              className={`p-2 rounded-full transition-colors ${isDarkMode ? 'bg-blue-500/30 text-yellow-300 hover:bg-blue-500/50' : 'bg-white/15 text-white hover:bg-white/25'}`}
               aria-label="Toggle dark mode"
             >
               {isDarkMode ? (
@@ -207,41 +238,34 @@ function App() {
         </div>
       </header>
 
-      <nav className={isDarkMode ? 'bg-gray-800 shadow-sm' : 'bg-white shadow-sm'}>
-        <div className="container mx-auto">
-          <div className="flex space-x-8">
-            <button
-              onClick={() => setActiveTab('goals')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'goals' || activeTab === 'details' ? (isDarkMode ? 'border-blue-500 text-blue-400' : 'border-blue-500 text-blue-600') : (isDarkMode ? 'border-transparent text-gray-300 hover:text-gray-100 hover:border-gray-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300')}`}
-            >
-              Goals
-            </button>
-            <button
-              onClick={() => setActiveTab('entries')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'entries' ? (isDarkMode ? 'border-blue-500 text-blue-400' : 'border-blue-500 text-blue-600') : (isDarkMode ? 'border-transparent text-gray-300 hover:text-gray-100 hover:border-gray-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300')}`}
-            >
-              Weekly Entries
-            </button>
-            <button
-              onClick={() => setActiveTab('charts')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'charts' ? (isDarkMode ? 'border-blue-500 text-blue-400' : 'border-blue-500 text-blue-600') : (isDarkMode ? 'border-transparent text-gray-300 hover:text-gray-100 hover:border-gray-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300')}`}
-            >
-              Charts
-            </button>
-            <button
-              onClick={() => setShowCreateGoalModal(true)}
-              className={`py-4 px-3 border-b-2 border-transparent text-xl font-bold ${isDarkMode ? 'text-gray-300 hover:text-gray-100' : 'text-gray-500 hover:text-gray-700'}`}
-              aria-label="Create Goal"
-            >
-              +
-            </button>
-          </div>
+    <nav className="nav">
+      <div className="container-app">
+        <div className="flex space-x-8">
+          <button
+            onClick={() => setActiveTab('goals')}
+            className={`nav-tab ${activeTab === 'goals' || activeTab === 'details' ? 'active' : ''}`}
+          >
+            Goals
+          </button>
+          <button
+            onClick={() => setActiveTab('entries')}
+            className={`nav-tab ${activeTab === 'entries' ? 'active' : ''}`}
+          >
+            Daily Entries
+          </button>
+          <button
+            onClick={() => setActiveTab('charts')}
+            className={`nav-tab ${activeTab === 'charts' ? 'active' : ''}`}
+          >
+            Charts
+          </button>
         </div>
-      </nav>
+      </div>
+    </nav>
 
-      <main className="container mx-auto py-8">
+      <main className="container-app py-8">
         {error && (
-          <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          <div className="alert alert-danger" role="alert">
             <p>{error}</p>
             <button
               onClick={() => setError(null)}
@@ -254,15 +278,24 @@ function App() {
 
         {loading ? (
           <div className="text-center py-8">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-            <p className="mt-2">Loading data...</p>
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
+            <p className="mt-2 text-[var(--text-muted)]">Loading data...</p>
           </div>
         ) : (
           <>
             {activeTab === 'goals' && (
               <div className="flex flex-row h-[calc(100vh-200px)] space-x-4">
-                <div className="w-1/3 border-r dark:border-gray-700 overflow-y-auto p-4">
+                <div className="w-1/3 overflow-y-auto p-4 pane">
                   <div className="flex justify-between items-center mb-6">
+                    <button
+                      onClick={() => setShowCreateGoalModal(true)}
+                      className="btn btn-primary w-full flex items-center justify-center text-lg"
+                      aria-label="Create Goal"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                      </svg>
+                    </button>
                   </div>
 
                   {editingGoal ? (
@@ -276,24 +309,27 @@ function App() {
                   <GoalList goals={goals} selectedGoalId={selectedGoalId} onEdit={handleEditGoal} onDelete={handleGoalDelete} onSelect={handleSelectGoal} entries={entries} />
                 </div>
 
-                <div className="w-2/3 overflow-y-auto p-4">
+                <div className="w-2/3 overflow-y-auto p-4 pane-detail">
                   {selectedGoal ? (
                     <GoalDetail
                       goal={selectedGoal}
                       goals={goals}
                       onSubmit={handleEntrySubmit}
+                      onUpdateEntry={handleInlineEntryUpdate}
                       onEditEntry={handleEditEntry}
                       onDeleteEntry={handleEntryDelete}
                       entries={entries}
+                      isDarkMode={isDarkMode}
+                      onGoalUpdated={(updated) => setGoals((prev) => prev.map((g) => (g.id === updated.id ? updated : g)))}
                     />
                   ) : (
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 h-full flex items-center justify-center">
-                      <p className="text-gray-500 dark:text-gray-400">Select a goal to view details</p>
+                    <div className="empty-state h-full flex items-center justify-center p-6">
+                      <p>Select a goal to view details</p>
                     </div>
                   )}
 
                   {editingEntry ? (
-                    <EditWeeklyEntryForm
+                    <EditDailyEntryForm
                       entry={editingEntry}
                       goals={goals.map(g => ({ id: g.id, name: g.name }))}
                       onSubmit={handleEntryEdit}
@@ -307,12 +343,12 @@ function App() {
             {activeTab === 'entries' && (
               <div>
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-semibold">Weekly Entries</h2>
-                  <CreateWeeklyEntryForm goals={goals} onSubmit={handleEntrySubmit} />
+                  <h2 className="text-xl font-semibold">Daily Entries</h2>
+                  <CreateDailyEntryForm goals={goals} onSubmit={handleEntrySubmit} />
                 </div>
 
                 {editingEntry ? (
-                  <EditWeeklyEntryForm
+                  <EditDailyEntryForm
                     entry={editingEntry}
                     goals={goals.map(g => ({id: g.id, name: g.name}))}
                     onSubmit={handleEntryEdit}
@@ -320,7 +356,7 @@ function App() {
                   />
                 ) : null}
 
-                <WeeklyEntryList
+                <DailyEntryList
                   entries={entries}
                   goals={goals}
                   onEdit={handleEditEntry}
@@ -331,8 +367,27 @@ function App() {
 
             {activeTab === 'charts' && (
               <div>
-                <h2 className="text-xl font-semibold mb-6">Progress Charts</h2>
-                <ChartView data={chartData} />
+                <div className="flex flex-wrap items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold">Progress Charts</h2>
+                  <div className="flex flex-wrap gap-2 items-center">
+                    {(['7d', '30d', 'week', 'all'] as const).map((r) => (
+                      <button
+                        key={r}
+                        onClick={() => { setChartRange(r); refreshChart(r, chartAnchor); }}
+                        className={chartRange === r ? 'btn btn-primary' : 'btn btn-secondary'}
+                      >
+                        {r === '7d' ? 'Last 7 days' : r === '30d' ? 'Last 30 days' : r === 'week' ? 'This Week' : 'All'}
+                      </button>
+                    ))}
+                    <input
+                      type="date"
+                      value={chartAnchor}
+                      onChange={(e) => { setChartAnchor(e.target.value); refreshChart(chartRange, e.target.value); }}
+                      className="form-input !mb-0 w-auto"
+                    />
+                  </div>
+                </div>
+                <ChartView data={chartData} isDarkMode={isDarkMode} />
               </div>
             )}
           </>
@@ -341,14 +396,14 @@ function App() {
 
       {/* Create Goal Modal */}
       {showCreateGoalModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="surface rounded-xl shadow-lg w-full max-w-md border border-[var(--border)]" style={{ backgroundColor: 'var(--bg-elevated)' }}>
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Create New Goal</h3>
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Create New Goal</h3>
                 <button
                   onClick={() => setShowCreateGoalModal(false)}
-                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -364,9 +419,9 @@ function App() {
         </div>
       )}
 
-      <footer className={isDarkMode ? 'bg-gray-800 border-t border-gray-700 mt-8 py-6' : 'bg-gray-100 border-t mt-8 py-6'}>
-        <div className="container mx-auto text-center text-gray-600">
-          <p>Weekly Progress Tracker &copy; {new Date().getFullYear()}</p>
+      <footer className="footer mt-8 py-6">
+        <div className="container-app text-center">
+          <p>Personal Progress Tracker &copy; {new Date().getFullYear()}</p>
         </div>
       </footer>
     </div>
