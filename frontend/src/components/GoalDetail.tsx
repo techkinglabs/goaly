@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Goal, DailyEntry, TargetHistoryEntry } from '../types';
-import { addTargetHistory, updateTargetHistory, deleteTargetHistory } from '../api';
+import { addTargetHistory, updateTargetHistory, deleteTargetHistory, apiGet } from '../api';
 import {
   LineChart,
   Line,
@@ -33,28 +33,44 @@ const PERIOD_LABELS: Record<string, string> = {
   YEAR: 'Year',
   MONTH: 'Month',
   WEEK: 'Week',
+  WORKWEEK: 'Workweek',
+  WEEKEND: 'Weekend',
   DAY: 'Day',
-  ONGOING: 'Ongoing',
+};
+
+const DAYS_PER_PERIOD: Record<string, number> = {
+  DAY: 1,
+  WEEK: 7,
+  WORKWEEK: 5,
+  WEEKEND: 2,
+  MONTH: 30.4375,
+  YEAR: 365.25,
 };
 
 const derivePeriodEquivalents = (value: number, period: string): { day: number; week: number; month: number; year: number } => {
   const amount = value || 0;
   const p = (period || 'WEEK').toUpperCase();
-  if (p === 'DAY') return { day: amount, week: amount * 7, month: amount * 30.4375, year: amount * 365.25 };
-  if (p === 'WEEK') return { day: amount / 7, week: amount, month: amount * 4.345, year: amount * 52 };
-  if (p === 'MONTH') return { day: amount / 30.4375, week: amount / 4.345, month: amount, year: amount * 12 };
-  if (p === 'YEAR') return { day: amount / 365.25, week: amount / 52, month: amount / 12, year: amount };
-  return { day: amount, week: amount, month: amount, year: amount };
+  const days = DAYS_PER_PERIOD[p] ?? 7;
+  const daily = amount / days;
+  return {
+    day: daily,
+    week: daily * DAYS_PER_PERIOD.WEEK,
+    month: daily * DAYS_PER_PERIOD.MONTH,
+    year: daily * DAYS_PER_PERIOD.YEAR,
+  };
 };
 
 const derivePeriodTargets = (goal: Goal): { week?: number; month?: number; year?: number } => {
   const base = goal.amountPerPeriod && goal.amountPerPeriod > 0 ? goal.amountPerPeriod : (goal.targetValue ?? 0);
   const amount = base || 0;
-  const period = goal.period ?? 'ONGOING';
-  if (period === 'WEEK') return { week: amount, month: amount * 4.345, year: amount * 52 };
-  if (period === 'MONTH') return { week: amount / 4.345, month: amount, year: amount * 12 };
-  if (period === 'YEAR') return { week: amount / 52, month: amount / 12, year: amount };
-  return { week: amount, month: amount, year: amount };
+  const period = goal.period ?? 'WEEK';
+  const days = DAYS_PER_PERIOD[period] ?? 7;
+  const daily = amount / days;
+  return {
+    week: daily * DAYS_PER_PERIOD.WEEK,
+    month: daily * DAYS_PER_PERIOD.MONTH,
+    year: daily * DAYS_PER_PERIOD.YEAR,
+  };
 };
 
 const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdateEntry, onEditEntry, onDeleteEntry, entries, onGoalUpdated, isDarkMode }) => {
@@ -145,6 +161,17 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
     });
   }, [rangeFilteredEntries, goal]);
 
+  const percentDomainMax = useMemo(() => {
+    const max = chartData.reduce((m, d) => Math.max(m, d.totalProgress, d.progress), 0);
+    return Math.max(100, Math.ceil(max / 25) * 25);
+  }, [chartData]);
+
+  const percentTicks = useMemo(() => {
+    const ticks: number[] = [0, 25, 50, 75, 100];
+    for (let v = 125; v <= percentDomainMax; v += 25) ticks.push(v);
+    return ticks;
+  }, [percentDomainMax]);
+
   const totalActual = useMemo(() => {
     return goalEntries.reduce((sum, entry) => sum + entry.actualValue, 0);
   }, [goalEntries]);
@@ -162,7 +189,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
     }
     try {
       await addTargetHistory(goal.id, newValidFrom, Number(historyNewValue), newValidTo || null, historyNewPeriod);
-      const refreshed = await (await fetch(`/api/goals/${goal.id}`)).json();
+      const refreshed = await apiGet<Goal>(`/api/goals/${goal.id}`);
       if (onGoalUpdated) onGoalUpdated(refreshed);
       setNewValidFrom('');
       setNewValidTo('');
@@ -203,7 +230,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
           </div>
           <div className="stat-tile">
             <p className="text-sm text-[var(--text-muted)]">Period</p>
-            <p className="text-xl font-semibold text-[var(--text-primary)]">{PERIOD_LABELS[goal.period ?? 'ONGOING'] || goal.period}</p>
+            <p className="text-xl font-semibold text-[var(--text-primary)]">{PERIOD_LABELS[goal.period ?? 'WEEK'] || goal.period}</p>
           </div>
         </div>
 
@@ -264,8 +291,8 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                 <YAxis
                   yAxisId="percent"
                   className={isDarkMode ? 'dark:fill-gray-300' : 'fill-slate-500'}
-                  domain={[0, 100]}
-                  ticks={[0, 25, 50, 75, 100]}
+                  domain={[0, percentDomainMax]}
+                  ticks={percentTicks}
                   tickFormatter={(value) => `${value}%`}
                 />
                 <YAxis
@@ -506,7 +533,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                                   if (editHistoryValue === '' || isNaN(Number(editHistoryValue))) { setEditHistoryError('Value is required.'); return; }
                                   try {
                                     await updateTargetHistory(goal.id, h.id, editHistoryFrom, Number(editHistoryValue), editHistoryTo || null, editHistoryPeriod);
-                                    const refreshed = await (await fetch(`/api/goals/${goal.id}`)).json();
+                                    const refreshed = await apiGet<Goal>(`/api/goals/${goal.id}`);
                                     if (onGoalUpdated) onGoalUpdated(refreshed);
                                     setEditingHistoryId(null);
                                     setEditHistoryError(null);
@@ -558,7 +585,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                                 if (!window.confirm('Are you sure you want to delete this target change?')) return;
                                 try {
                                   await deleteTargetHistory(goal.id, h.id);
-                                  const refreshed = await (await fetch(`/api/goals/${goal.id}`)).json();
+                                  const refreshed = await apiGet<Goal>(`/api/goals/${goal.id}`);
                                   if (onGoalUpdated) onGoalUpdated(refreshed);
                                 } catch (err: any) {
                                   setHistoryError(err?.message || 'Failed to delete target change.');

@@ -5,6 +5,7 @@ import org.example.entity.TargetHistory;
 import org.example.exception.ResourceNotFoundException;
 import org.example.repository.GoalRepository;
 import org.example.repository.TargetHistoryRepository;
+import org.example.repository.DailyEntryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -22,8 +23,18 @@ public class GoalService {
     @Autowired
     private TargetHistoryRepository targetHistoryRepository;
 
+    @Autowired
+    private DailyEntryRepository dailyEntryRepository;
+
     public List<Goal> getAllActiveGoals() {
         return goalRepository.findByIsActiveTrue();
+    }
+
+    public List<Goal> getGoals(Boolean active) {
+        if (active == null) {
+            return goalRepository.findAll();
+        }
+        return active ? goalRepository.findByIsActiveTrue() : goalRepository.findByIsActiveFalse();
     }
 
     public Optional<Goal> getGoalById(Long id) {
@@ -56,6 +67,7 @@ public class GoalService {
         Goal goal = goalRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
 
+        dailyEntryRepository.deleteByGoalId(id);
         targetHistoryRepository.findByGoalIdOrderByValidFromAsc(id)
                 .forEach(targetHistoryRepository::delete);
 
@@ -67,6 +79,9 @@ public class GoalService {
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + goalId));
 
         String normalizedPeriod = normalizePeriod(period);
+        if (validTo != null && validTo.isBefore(validFrom)) {
+            throw new IllegalArgumentException("validTo must not be before validFrom");
+        }
         Optional<TargetHistory> existing = targetHistoryRepository
                 .findFirstByGoalIdAndValidFromLessThanEqualOrderByValidFromDesc(goalId, validFrom);
         TargetHistory history;
@@ -110,6 +125,16 @@ public class GoalService {
             throw new ResourceNotFoundException("Target history not found with id: " + historyId);
         }
         String normalizedPeriod = normalizePeriod(period);
+        if (validTo != null && validTo.isBefore(validFrom)) {
+            throw new IllegalArgumentException("validTo must not be before validFrom");
+        }
+        TargetHistory previous = targetHistoryRepository
+                .findFirstByGoalIdAndValidFromLessThanOrderByValidFromDesc(goalId, validFrom)
+                .orElse(null);
+        if (previous != null && previous.getId() != null && !previous.getId().equals(historyId)
+                && !validFrom.isAfter(previous.getValidFrom())) {
+            throw new IllegalArgumentException("validFrom must be after the previous history entry's validFrom");
+        }
         history.setValidFrom(validFrom);
         history.setValidTo(validTo);
         history.setValue(value);
@@ -126,15 +151,19 @@ public class GoalService {
             case "WEEK", "WEEKLY", "W" -> "WEEK";
             case "MONTH", "MONTHLY", "M" -> "MONTH";
             case "YEAR", "YEARLY", "ANNUAL", "Y" -> "YEAR";
+            case "WORKWEEK", "WORK_WEEK", "WW" -> "WORKWEEK";
+            case "WEEKEND", "WE" -> "WEEKEND";
             default -> "WEEK";
         };
     }
 
-    private BigDecimal toWeekly(BigDecimal value, String period) {
+    BigDecimal toWeekly(BigDecimal value, String period) {
         return switch (period) {
             case "DAY" -> value.multiply(BigDecimal.valueOf(7));
-            case "MONTH" -> value.divide(BigDecimal.valueOf(4.345), 4, java.math.RoundingMode.HALF_UP);
-            case "YEAR" -> value.divide(BigDecimal.valueOf(52), 4, java.math.RoundingMode.HALF_UP);
+            case "MONTH" -> value.divide(BigDecimal.valueOf(30.4375), 4, java.math.RoundingMode.HALF_UP);
+            case "YEAR" -> value.divide(BigDecimal.valueOf(365.25), 4, java.math.RoundingMode.HALF_UP);
+            case "WORKWEEK" -> value.divide(BigDecimal.valueOf(5), 4, java.math.RoundingMode.HALF_UP);
+            case "WEEKEND" -> value.divide(BigDecimal.valueOf(2), 4, java.math.RoundingMode.HALF_UP);
             default -> value;
         };
     }

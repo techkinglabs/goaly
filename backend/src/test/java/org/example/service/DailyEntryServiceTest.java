@@ -73,4 +73,44 @@ class DailyEntryServiceTest {
         verify(goalService).getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
         verify(dailyEntryRepository).save(entry);
     }
+
+    @Test
+    void testUpdateDailyEntryDuplicateDateThrows() {
+        DailyEntry existing = new DailyEntry();
+        existing.setId(1L);
+        existing.setGoalId(1L);
+        existing.setEntryDate(LocalDate.of(2026, 1, 1));
+
+        DailyEntry moved = new DailyEntry();
+        moved.setId(2L);
+        moved.setGoalId(1L);
+        moved.setEntryDate(LocalDate.of(2026, 1, 1));
+
+        Goal goal = mock(Goal.class);
+        when(goalRepository.findById(moved.getGoalId())).thenReturn(Optional.of(goal));
+        when(dailyEntryRepository.existsByGoalIdAndEntryDateAndIdNot(
+                moved.getGoalId(), moved.getEntryDate(), moved.getId())).thenReturn(true);
+
+        assertThrows(org.example.exception.DuplicateDayException.class,
+                () -> dailyEntryService.updateDailyEntryInDb(moved));
+        verify(dailyEntryRepository, never()).save(any());
+    }
+
+    @Test
+    void testUpdateDailyEntryAllowsSameDateForSameId() {
+        DailyEntry entry = new DailyEntry();
+        entry.setId(5L);
+        entry.setGoalId(1L);
+        entry.setEntryDate(LocalDate.of(2026, 1, 1));
+
+        Goal goal = mock(Goal.class);
+        when(goalRepository.findById(entry.getGoalId())).thenReturn(Optional.of(goal));
+        when(goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate())).thenReturn(new BigDecimal("9"));
+        when(dailyEntryRepository.save(entry)).thenReturn(entry);
+
+        DailyEntry result = dailyEntryService.updateDailyEntryInDb(entry);
+
+        assertEquals(new BigDecimal("9"), result.getTargetValue());
+        verify(dailyEntryRepository).save(entry);
+    }
 }

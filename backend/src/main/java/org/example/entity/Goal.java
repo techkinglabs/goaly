@@ -8,7 +8,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 @Entity
 @Table(name = "goals")
@@ -33,7 +32,7 @@ public class Goal {
     private BigDecimal targetValue;
 
     @Column(name = "period", nullable = false)
-    private String period = "ONGOING";
+    private String period = "WEEK";
 
     @Column(name = "amount_per_period", nullable = false)
     private BigDecimal amountPerPeriod = BigDecimal.ZERO;
@@ -43,12 +42,4 @@ public class Goal {
     
     @Column(name = "description")
     private String description;
-    
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(
-            name = "goal_days_of_week",
-            joinColumns = @JoinColumn(name = "goal_id")
-    )
-    @Column(name = "day_of_week")
-    private List<String> daysOfWeek;
 }

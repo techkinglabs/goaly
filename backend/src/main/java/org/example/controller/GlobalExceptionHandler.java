@@ -1,7 +1,6 @@
 package org.example.controller;
 
 import org.example.exception.DuplicateDayException;
-import org.example.exception.DuplicateWeekException;
 import org.example.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,12 +16,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleNotFound(ResourceNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Map.of("error", "Not Found", "message", ex.getMessage()));
-    }
-
-    @ExceptionHandler(DuplicateWeekException.class)
-    public ResponseEntity<Map<String, Object>> handleDuplicate(DuplicateWeekException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(Map.of("error", "Conflict", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(DuplicateDayException.class)

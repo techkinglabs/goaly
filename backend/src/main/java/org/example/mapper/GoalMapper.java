@@ -28,7 +28,6 @@ public class GoalMapper {
             goal.getTargetValue(),
             goal.getIsActive(),
             goal.getDescription(),
-            goal.getDaysOfWeek(),
             goal.getPeriod(),
             goal.getAmountPerPeriod(),
             history
@@ -55,8 +54,7 @@ public class GoalMapper {
         goal.setTargetValue(request.targetValue());
         goal.setIsActive(request.isActive() != null ? request.isActive() : true);
         goal.setDescription(request.description());
-        goal.setDaysOfWeek(request.daysOfWeek());
-        goal.setPeriod(request.period() != null ? request.period() : "ONGOING");
+        goal.setPeriod(request.period() != null ? request.period() : "WEEK");
         goal.setAmountPerPeriod(request.amountPerPeriod() != null ? request.amountPerPeriod() : BigDecimal.ZERO);
         return goal;
     }
@@ -68,7 +66,6 @@ public class GoalMapper {
         goal.setTargetValue(request.targetValue());
         goal.setIsActive(request.isActive() != null ? request.isActive() : goal.getIsActive());
         goal.setDescription(request.description());
-        goal.setDaysOfWeek(request.daysOfWeek());
         if (request.period() != null) {
             goal.setPeriod(request.period());
         }

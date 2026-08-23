@@ -14,8 +14,7 @@ export interface Goal {
   targetValue: number;
   isActive: boolean;
   description?: string;
-  daysOfWeek?: string[];
-  period?: 'YEAR' | 'MONTH' | 'WEEK' | 'ONGOING';
+  period?: 'YEAR' | 'MONTH' | 'WEEK' | 'WORKWEEK' | 'WEEKEND';
   amountPerPeriod?: number;
   targetHistory?: TargetHistoryEntry[];
 }

@@ -23,6 +23,8 @@ function App() {
   const [error, setError] = useState<string | null>(null); // Global error state
   const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null); // For Jira-style detail view
 
+  const [goalFilter, setGoalFilter] = useState<'all' | 'active' | 'inactive'>('active');
+
   const [chartRange, setChartRange] = useState<string>('all');
   const [chartAnchor, setChartAnchor] = useState<string>(new Date().toISOString().split('T')[0]);
 
@@ -31,6 +33,17 @@ function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
   }, [isDarkMode]);
+
+  const loadGoals = async (filter: 'all' | 'active' | 'inactive' = 'active') => {
+    const params = new URLSearchParams();
+    if (filter !== 'all') params.set('active', filter === 'active' ? 'true' : 'false');
+    const fetchedGoals = await apiGet<Goal[]>(`/api/goals${params.toString() ? `?${params.toString()}` : ''}`);
+    setGoals(fetchedGoals);
+    setSelectedGoalId((prev) => {
+      if (prev != null && fetchedGoals.some((g) => g.id === prev)) return prev;
+      return fetchedGoals.length > 0 ? fetchedGoals[0].id : null;
+    });
+  };
 
   const refreshChart = async (range: string, anchor: string) => {
     try {
@@ -48,7 +61,7 @@ function App() {
     const loadData = async () => {
       setLoading(true);
       try {
-        const fetchedGoals = await apiGet<Goal[]>('/api/goals');
+        const fetchedGoals = await apiGet<Goal[]>(`/api/goals?active=true`);
         setGoals(fetchedGoals);
 
         if (fetchedGoals.length > 0) {
@@ -79,7 +92,6 @@ function App() {
     targetValue: number;
     isActive: boolean;
     description?: string;
-    daysOfWeek?: string[];
   }) => {
     try {
       const newGoal: Goal = await apiSend<Goal>('/api/goals', 'POST', goalData);
@@ -103,7 +115,6 @@ function App() {
       targetValue: updatedGoal.targetValue,
       isActive: updatedGoal.isActive,
       description: updatedGoal.description,
-      daysOfWeek: updatedGoal.daysOfWeek,
       period: updatedGoal.period,
       amountPerPeriod: updatedGoal.amountPerPeriod
     };
@@ -287,9 +298,20 @@ function App() {
               <div className="flex flex-row h-[calc(100vh-200px)] space-x-4">
                 <div className="w-1/3 overflow-y-auto p-4 pane">
                   <div className="flex justify-between items-center mb-6">
+                    <div className="flex gap-2">
+                      {(['active', 'inactive', 'all'] as const).map((f) => (
+                        <button
+                          key={f}
+                          onClick={() => { setGoalFilter(f); loadGoals(f); }}
+                          className={goalFilter === f ? 'btn btn-primary' : 'btn btn-secondary'}
+                        >
+                          {f === 'active' ? 'Active' : f === 'inactive' ? 'Inactive' : 'All'}
+                        </button>
+                      ))}
+                    </div>
                     <button
                       onClick={() => setShowCreateGoalModal(true)}
-                      className="btn btn-primary w-full flex items-center justify-center text-lg"
+                      className="btn btn-primary ml-auto flex items-center justify-center text-lg"
                       aria-label="Create Goal"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -387,7 +409,7 @@ function App() {
                     />
                   </div>
                 </div>
-                <ChartView data={chartData} isDarkMode={isDarkMode} />
+                <ChartView data={chartData} isDarkMode={isDarkMode} goals={goals} />
               </div>
             )}
           </>

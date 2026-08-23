@@ -7,6 +7,11 @@ A web application to track weekly progress against ongoing goals using a templat
 - `backend/`: Spring Boot application with JPA and PostgreSQL
 - `frontend/`: React application with TypeScript and Tailwind CSS
 
+## Authentication
+
+This is a single-user "Personal Progress Tracker" — there is no authentication or
+multi-tenant support. Goals and entries are not partitioned by user.
+
 ## Getting Started
 
 ### Prerequisites

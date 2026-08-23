@@ -57,6 +57,11 @@ public class DailyEntryService {
         Goal goal = goalRepository.findById(entry.getGoalId())
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + entry.getGoalId()));
 
+        if (dailyEntryRepository.existsByGoalIdAndEntryDateAndIdNot(entry.getGoalId(), entry.getEntryDate(), entry.getId())) {
+            throw new DuplicateDayException("An entry for goal " + entry.getGoalId()
+                    + " and date " + entry.getEntryDate() + " already exists");
+        }
+
         BigDecimal effectiveTarget = goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
         entry.setTargetValue(effectiveTarget);
 
@@ -68,5 +73,9 @@ public class DailyEntryService {
                 .orElseThrow(() -> new ResourceNotFoundException("Daily entry not found with id: " + id));
 
         dailyEntryRepository.delete(entry);
+    }
+
+    public void deleteByGoalId(Long goalId) {
+        dailyEntryRepository.deleteByGoalId(goalId);
     }
 }

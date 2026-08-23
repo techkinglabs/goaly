@@ -15,8 +15,7 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
   const [targetValue, setTargetValue] = useState<number | ''>('');
   const [isActive, setIsActive] = useState(true);
   const [description, setDescription] = useState('');
-  const [daysOfWeek, setDaysOfWeek] = useState<string[]>([]);
-  const [period, setPeriod] = useState('ONGOING');
+  const [period, setPeriod] = useState<'YEAR' | 'MONTH' | 'WEEK' | 'WORKWEEK' | 'WEEKEND'>('WEEK');
   const [amountPerPeriod, setAmountPerPeriod] = useState<number | ''>('');
 
   useEffect(() => {
@@ -35,8 +34,7 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
       setTargetValue(goal.targetValue);
       setIsActive(goal.isActive);
       setDescription(goal.description || '');
-      setDaysOfWeek(goal.daysOfWeek || []);
-      setPeriod(goal.period || 'ONGOING');
+      setPeriod(goal.period || 'WEEK');
       setAmountPerPeriod(goal.amountPerPeriod ?? goal.targetValue);
     }
   }, [goal]);
@@ -60,30 +58,9 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
       targetValue: Number(targetValue),
       isActive,
       description,
-      daysOfWeek,
       period,
       amountPerPeriod: amountPerPeriod === '' ? Number(targetValue) : Number(amountPerPeriod)
     });
-  };
-
-  const toggleDay = (day: string) => {
-    if (daysOfWeek.includes(day)) {
-      setDaysOfWeek(daysOfWeek.filter(d => d !== day));
-    } else {
-      setDaysOfWeek([...daysOfWeek, day]);
-    }
-  };
-
-  const selectAllDays = () => {
-    setDaysOfWeek(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']);
-  };
-
-  const unselectAllDays = () => {
-    setDaysOfWeek([]);
-  };
-
-  const selectWorkWeek = () => {
-    setDaysOfWeek(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY']);
   };
 
     return (
@@ -165,11 +142,12 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
         <select
           id="period"
           value={period}
-          onChange={(e) => setPeriod(e.target.value)}
+          onChange={(e) => setPeriod(e.target.value as 'YEAR' | 'MONTH' | 'WEEK' | 'WORKWEEK' | 'WEEKEND')}
           className="form-input"
         >
-          <option value="ONGOING">Ongoing (forever)</option>
           <option value="WEEK">Per Week</option>
+          <option value="WORKWEEK">Per Workweek (5 days)</option>
+          <option value="WEEKEND">Per Weekend (2 days)</option>
           <option value="MONTH">Per Month</option>
           <option value="YEAR">Per Year</option>
         </select>
@@ -188,46 +166,6 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
           placeholder="Defaults to Target Value if empty"
           className="form-input"
         />
-      </div>
-
-      <div className="mb-6">
-        <label className="form-label">Days of Week</label>
-        <div className="flex flex-wrap gap-2 mb-3">
-          <button
-            type="button"
-            onClick={selectAllDays}
-            className="badge badge-accent !cursor-pointer hover:opacity-80 transition-opacity"
-          >
-            Select All
-          </button>
-          <button
-            type="button"
-            onClick={unselectAllDays}
-            className="badge badge-info !cursor-pointer hover:opacity-80 transition-opacity"
-          >
-            Unselect All
-          </button>
-          <button
-            type="button"
-            onClick={selectWorkWeek}
-            className="badge badge-success !cursor-pointer hover:opacity-80 transition-opacity"
-          >
-            Select Work Week
-          </button>
-        </div>
-        <div className="grid grid-cols-7 gap-2">
-          {['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'].map(day => (
-            <label key={day} className="flex items-center space-x-1 text-[var(--text-secondary)]">
-              <input
-                type="checkbox"
-                checked={daysOfWeek.includes(day)}
-                onChange={() => toggleDay(day)}
-                className="mr-1 rounded focus:ring-2 focus:ring-[var(--accent)] accent-[var(--accent)]"
-              />
-              <span className="text-sm">{day.substring(0, 3)}</span>
-            </label>
-          ))}
-        </div>
       </div>
 
       <div className="mb-6">

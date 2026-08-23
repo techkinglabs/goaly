@@ -30,8 +30,8 @@ public class GoalController {
     private TargetHistoryRepository targetHistoryRepository;
 
     @GetMapping
-    public List<GoalResponse> getAllActiveGoals() {
-        return goalService.getAllActiveGoals().stream()
+    public List<GoalResponse> getAllActiveGoals(@RequestParam(required = false) Boolean active) {
+        return goalService.getGoals(active).stream()
                 .map(goal -> GoalMapper.toResponse(goal, targetHistoryRepository))
                 .collect(Collectors.toList());
     }

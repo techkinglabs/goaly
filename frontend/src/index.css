@@ -196,7 +196,8 @@ body {
 
 .goal-card.selected {
   background-color: var(--bg-selected);
-  border-color: var(--accent-soft-border);
+  border-color: var(--accent);
+  border-width: 2px;
   box-shadow: var(--shadow-md);
 }
 

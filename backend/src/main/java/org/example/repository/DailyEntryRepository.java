@@ -12,4 +12,8 @@ public interface DailyEntryRepository extends JpaRepository<DailyEntry, Long> {
     List<DailyEntry> findByGoalIdOrderByEntryDate(Long goalId);
 
     boolean existsByGoalIdAndEntryDate(Long goalId, LocalDate entryDate);
+
+    boolean existsByGoalIdAndEntryDateAndIdNot(Long goalId, LocalDate entryDate, Long id);
+
+    void deleteByGoalId(Long goalId);
 }

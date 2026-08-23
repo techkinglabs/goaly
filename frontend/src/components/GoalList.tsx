@@ -44,14 +44,14 @@ const GoalList: React.FC<GoalListProps> = ({ goals, selectedGoalId, onEdit, onDe
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       {goals.map((goal) => {
         const progress = calculateProgress(goal, entries);
         const isGoalSelected = goal.id === selectedGoalId;
         return (
           <div
             key={goal.id}
-            className={`card !p-3 !mb-0 cursor-pointer transition-all ${isGoalSelected ? 'selected' : 'hover:shadow-md'}`}
+            className={`card goal-card !p-3 !mb-0 cursor-pointer transition-all ${isGoalSelected ? 'selected' : 'hover:shadow-md'}`}
             onClick={() => handleClick(goal)}
           >
             <div className="flex justify-between items-start gap-2">

@@ -11,7 +11,6 @@ public record GoalResponse(
     BigDecimal targetValue,
     Boolean isActive,
     String description,
-    java.util.List<String> daysOfWeek,
     String period,
     BigDecimal amountPerPeriod,
     List<TargetHistoryResponse> targetHistory

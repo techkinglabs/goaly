@@ -50,11 +50,7 @@ SET valid_to = (
 --    Alternative for a clean slate: DROP TABLE target_history; then re-run section 4.
 ALTER TABLE target_history ADD COLUMN IF NOT EXISTS period VARCHAR(20) NOT NULL DEFAULT 'WEEK';
 
--- 8. Create goal_days_of_week collection table referenced by Goal.daysOfWeek
---    (@ElementCollection). Missing entirely from the original schema; under
---    prod (ddl-auto=validate) goals with daysOfWeek would fail. Additive + idempotent.
-CREATE TABLE IF NOT EXISTS goal_days_of_week (
-    goal_id BIGINT NOT NULL REFERENCES goals(id),
-    day_of_week VARCHAR(20)
-);
-CREATE INDEX IF NOT EXISTS idx_goal_days_of_week_goal_id ON goal_days_of_week(goal_id);
+-- 8. goal_days_of_week collection table (previously referenced by Goal.daysOfWeek)
+--    is no longer used by the application. Drop it to keep the schema clean and
+--    consistent with the entity model. Idempotent.
+DROP TABLE IF EXISTS goal_days_of_week;
