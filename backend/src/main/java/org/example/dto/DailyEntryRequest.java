@@ -11,5 +11,6 @@ public record DailyEntryRequest(
     @NotNull(message = "Actual value is required")
     @DecimalMin(value = "0.0", inclusive = true, message = "Actual value must not be negative")
     BigDecimal actualValue,
-    BigDecimal targetValue
+    BigDecimal targetValue,
+    String note
 ) {}

@@ -12,7 +12,8 @@ public class DailyEntryMapper {
             entry.getGoalId(),
             entry.getEntryDate(),
             entry.getActualValue(),
-            entry.getTargetValue()
+            entry.getTargetValue(),
+            entry.getNote()
         );
     }
 
@@ -23,6 +24,7 @@ public class DailyEntryMapper {
         entry.setEntryDate(request.entryDate());
         entry.setActualValue(request.actualValue());
         entry.setTargetValue(request.targetValue());
+        entry.setNote(request.note());
         return entry;
     }
 
@@ -32,5 +34,6 @@ public class DailyEntryMapper {
         entry.setEntryDate(request.entryDate());
         entry.setActualValue(request.actualValue());
         entry.setTargetValue(request.targetValue());
+        entry.setNote(request.note());
     }
 }

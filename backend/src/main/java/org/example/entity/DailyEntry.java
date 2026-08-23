@@ -10,10 +10,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "daily_entries", uniqueConstraints = @UniqueConstraint(
-        name = "uk_daily_entry_goal_date",
-        columnNames = {"goal_id", "entry_date"}
-))
+@Table(name = "daily_entries")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -37,4 +34,7 @@ public class DailyEntry {
     @Column(name = "target_value", nullable = false)
     @NotNull(message = "Target value is required")
     private BigDecimal targetValue;
+
+    @Column(name = "note", length = 1000)
+    private String note;
 }

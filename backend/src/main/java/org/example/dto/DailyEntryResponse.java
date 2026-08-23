@@ -8,5 +8,6 @@ public record DailyEntryResponse(
     Long goalId,
     LocalDate entryDate,
     BigDecimal actualValue,
-    BigDecimal targetValue
+    BigDecimal targetValue,
+    String note
 ) {}

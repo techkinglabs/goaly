@@ -2,7 +2,6 @@ package org.example.service;
 
 import org.example.entity.DailyEntry;
 import org.example.entity.Goal;
-import org.example.exception.DuplicateDayException;
 import org.example.exception.ResourceNotFoundException;
 import org.example.repository.DailyEntryRepository;
 import org.example.repository.GoalRepository;
@@ -42,11 +41,6 @@ public class DailyEntryService {
         Goal goal = goalRepository.findById(entry.getGoalId())
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + entry.getGoalId()));
 
-        if (dailyEntryRepository.existsByGoalIdAndEntryDate(entry.getGoalId(), entry.getEntryDate())) {
-            throw new DuplicateDayException("An entry for goal " + entry.getGoalId()
-                    + " and date " + entry.getEntryDate() + " already exists");
-        }
-
         BigDecimal effectiveTarget = goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
         entry.setTargetValue(effectiveTarget);
 
@@ -56,11 +50,6 @@ public class DailyEntryService {
     public DailyEntry updateDailyEntryInDb(DailyEntry entry) {
         Goal goal = goalRepository.findById(entry.getGoalId())
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + entry.getGoalId()));
-
-        if (dailyEntryRepository.existsByGoalIdAndEntryDateAndIdNot(entry.getGoalId(), entry.getEntryDate(), entry.getId())) {
-            throw new DuplicateDayException("An entry for goal " + entry.getGoalId()
-                    + " and date " + entry.getEntryDate() + " already exists");
-        }
 
         BigDecimal effectiveTarget = goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
         entry.setTargetValue(effectiveTarget);

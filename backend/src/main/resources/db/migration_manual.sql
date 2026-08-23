@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS daily_entries (
     entry_date      DATE NOT NULL,
     actual_value    NUMERIC(19,4) NOT NULL,
     target_value    NUMERIC(19,4) NOT NULL,
-    CONSTRAINT uk_daily_entry_goal_date UNIQUE (goal_id, entry_date)
+    note            VARCHAR(1000)
 );
 
 -- 3. Alter goals: add period + amount_per_period.

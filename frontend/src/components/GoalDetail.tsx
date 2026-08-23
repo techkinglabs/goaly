@@ -2,6 +2,14 @@ import React, { useState, useMemo } from 'react';
 import type { Goal, DailyEntry, TargetHistoryEntry } from '../types';
 import { addTargetHistory, updateTargetHistory, deleteTargetHistory, apiGet, formatDate } from '../api';
 import DatePicker from './DatePicker';
+
+// Local-date key (YYYY-MM-DD) without UTC shift — toISOString() would shift by timezone.
+const toLocalISO = (d: Date): string => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 import {
   LineChart,
   Line,
@@ -21,8 +29,9 @@ interface GoalDetailProps {
     goalId: number;
     entryDate: string;
     actualValue: number;
+    note?: string | null;
   }) => void;
-  onUpdateEntry?: (id: number, updates: { goalId: number; entryDate: string; actualValue: number; targetValue: number }) => void;
+  onUpdateEntry?: (id: number, updates: { goalId: number; entryDate: string; actualValue: number; targetValue: number; note?: string | null }) => void;
   onEditEntry?: (entry: DailyEntry) => void;
   onDeleteEntry?: (id: number) => void;
   entries: DailyEntry[]; // Added entries prop
@@ -78,7 +87,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
   const tooltipBg = isDarkMode ? '#1f2937' : '#f7faff';
   const tooltipBorder = isDarkMode ? '#374151' : '#b8cdf0';
   const tooltipText = isDarkMode ? '#f9fafb' : '#0f172a';
-  const [range, setRange] = useState<'7d' | '30d' | '365d' | 'week' | 'year' | 'all'>('all');
+  const [range, setRange] = useState<'7d' | '30d' | '365d' | 'week' | 'year' | 'all'>('week');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [newValidFrom, setNewValidFrom] = useState('');
   const [newValidTo, setNewValidTo] = useState('');
@@ -93,11 +102,13 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
   const [editHistoryError, setEditHistoryError] = useState<string | null>(null);
   const [editDate, setEditDate] = useState('');
   const [editValue, setEditValue] = useState('');
+  const [editNote, setEditNote] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [newDate, setNewDate] = useState('');
+  const [newDate, setNewDate] = useState(() => toLocalISO(new Date()));
   const [newValue, setNewValue] = useState('');
+  const [newNote, setNewNote] = useState('');
   const [newError, setNewError] = useState<string | null>(null);
 
   if (!goal) {
@@ -151,15 +162,19 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
     const target = goal.targetValue > 0 ? goal.targetValue : 1;
 
     if (rangeFrom === null) {
+      const byDate = new Map<string, number>();
+      goalEntries.forEach((e) => byDate.set(e.entryDate, (byDate.get(e.entryDate) ?? 0) + e.actualValue));
+      const sortedDates = [...byDate.keys()].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
       let runningTotal = 0;
-      return goalEntries.map((entry) => {
-        const progress = (entry.actualValue / target) * 100;
-        runningTotal += entry.actualValue;
+      return sortedDates.map((date) => {
+        const dayValue = byDate.get(date) ?? 0;
+        const progress = (dayValue / target) * 100;
+        runningTotal += dayValue;
         const totalProgress = (runningTotal / target) * 100;
         return {
-          entryDate: entry.entryDate,
+          entryDate: date,
           progress: Math.round(progress * 10) / 10,
-          progressRaw: entry.actualValue,
+          progressRaw: dayValue,
           totalProgress: Math.round(totalProgress * 10) / 10,
           totalRaw: runningTotal,
         };
@@ -170,8 +185,17 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const entriesByDate = new Map<string, DailyEntry>();
-    goalEntries.forEach((e) => entriesByDate.set(e.entryDate, e));
+    // For "this week" (Mon-Sun) show the entire week, including future days
+    // of the current week, so entries already logged later in the week appear.
+    let rangeTo = new Date(today);
+    if (range === 'week') {
+      const dayOfWeek = (today.getDay() + 6) % 7; // Monday = 0, Sunday = 6
+      rangeTo = new Date(today);
+      rangeTo.setDate(today.getDate() + (6 - dayOfWeek)); // advance to Sunday
+    }
+
+    const entriesByDate = new Map<string, number>();
+    goalEntries.forEach((e) => entriesByDate.set(e.entryDate, (entriesByDate.get(e.entryDate) ?? 0) + e.actualValue));
 
     const runningBefore = goalEntries
       .filter((e) => new Date(e.entryDate) < from)
@@ -186,17 +210,17 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
     }> = [];
 
     let runningTotal = runningBefore;
-    for (let d = new Date(from); d <= today; d.setDate(d.getDate() + 1)) {
-      const key = d.toISOString().split('T')[0];
-      const entry = entriesByDate.get(key);
-      if (entry) {
-        const progress = (entry.actualValue / target) * 100;
-        runningTotal += entry.actualValue;
+    for (let d = new Date(from); d <= rangeTo; d.setDate(d.getDate() + 1)) {
+      const key = toLocalISO(d);
+      const dayValue = entriesByDate.get(key) ?? 0;
+      if (dayValue > 0) {
+        const progress = (dayValue / target) * 100;
+        runningTotal += dayValue;
         const totalProgress = (runningTotal / target) * 100;
         points.push({
           entryDate: key,
           progress: Math.round(progress * 10) / 10,
-          progressRaw: entry.actualValue,
+          progressRaw: dayValue,
           totalProgress: Math.round(totalProgress * 10) / 10,
           totalRaw: runningTotal,
         });
@@ -732,14 +756,15 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
       </div>
 
       {/* Recent Entries Section */}
-      <div className="pane-detail">
+      <div className="pane-detail min-h-[70vh]">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium text-[var(--text-primary)]">Recent Entries</h3>
           <button
             onClick={() => {
               setIsAdding(true);
-              setNewDate('');
+              setNewDate(toLocalISO(new Date()));
               setNewValue('');
+              setNewNote('');
               setNewError(null);
             }}
             className="btn btn-primary rounded-full"
@@ -757,13 +782,14 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
               <tr>
                 <th scope="col">Date</th>
                 <th scope="col">Actual Value</th>
+                <th scope="col">Note</th>
                 <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody>
               {isAdding && (
                 <tr>
-                  <td className="whitespace-nowrap text-sm p-1">
+                  <td className="text-sm p-2 align-top">
                     <DatePicker
                       value={newDate}
                       onChange={setNewDate}
@@ -771,7 +797,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                       autoFocus
                     />
                   </td>
-                  <td className="whitespace-nowrap text-sm p-1">
+                  <td className="text-sm p-2 align-top">
                     <input
                       type="number"
                       value={newValue}
@@ -780,7 +806,16 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                       placeholder={goal.unit}
                     />
                   </td>
-                  <td className="whitespace-nowrap text-sm">
+                  <td className="text-sm p-2 align-top">
+                    <textarea
+                      value={newNote}
+                      onChange={(e) => setNewNote(e.target.value)}
+                      className="form-input !mb-0 w-full"
+                      rows={3}
+                      placeholder="Add a note..."
+                    />
+                  </td>
+                  <td className="text-sm p-2 align-top">
                     {newError && (
                       <p className="text-red-600 dark:text-red-400 text-xs mb-1">{newError}</p>
                     )}
@@ -789,7 +824,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                         onClick={() => {
                           if (!newDate) { setNewError('Date is required.'); return; }
                           if (newValue === '' || isNaN(Number(newValue))) { setNewError('Value is required.'); return; }
-                          onSubmit({ goalId: goal.id, entryDate: newDate, actualValue: Number(newValue) });
+                          onSubmit({ goalId: goal.id, entryDate: newDate, actualValue: Number(newValue), note: newNote.trim() || null });
                           setIsAdding(false);
                           setNewError(null);
                         }}
@@ -817,7 +852,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
               )}
               {recentEntries.length === 0 && !isAdding && (
                 <tr>
-                  <td colSpan={3} className="text-center text-[var(--text-muted)] py-3">
+                  <td colSpan={4} className="text-center text-[var(--text-muted)] py-6">
                     No entries yet for this goal
                   </td>
                 </tr>
@@ -835,10 +870,10 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                           />
                         </td>
                       ) : (
-                        <td className="whitespace-nowrap text-sm">{formatDate(entry.entryDate)}</td>
+                        <td className="text-sm p-2 align-top">{formatDate(entry.entryDate)}</td>
                       )}
                       {isEditing ? (
-                        <td className="whitespace-nowrap text-sm p-1">
+                        <td className="text-sm p-2 align-top">
                           <input
                             type="number"
                             value={editValue}
@@ -847,9 +882,22 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                           />
                         </td>
                       ) : (
-                        <td className="whitespace-nowrap text-sm">{entry.actualValue} {goal.unit}</td>
+                        <td className="text-sm p-2 align-top">{entry.actualValue} {goal.unit}</td>
                       )}
-                      <td className="whitespace-nowrap text-sm">
+                      {isEditing ? (
+                        <td className="text-sm p-2 align-top">
+                          <textarea
+                            value={editNote}
+                            onChange={(e) => setEditNote(e.target.value)}
+                            className="form-input !mb-0 w-full"
+                            rows={3}
+                            placeholder="Add a note..."
+                          />
+                        </td>
+                      ) : (
+                        <td className="text-sm p-2 align-top text-[var(--text-secondary)]">{entry.note || <span className="text-[var(--text-muted)]">—</span>}</td>
+                      )}
+                      <td className="text-sm p-2 align-top">
                         {isEditing ? (
                           <>
                             {editError && (
@@ -865,6 +913,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                                     entryDate: editDate,
                                     actualValue: Number(editValue),
                                     targetValue: entry.targetValue,
+                                    note: editNote.trim() || null,
                                   });
                                   setEditingId(null);
                                   setEditError(null);
@@ -897,6 +946,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                                   setEditingId(entry.id);
                                   setEditDate(entry.entryDate);
                                   setEditValue(String(entry.actualValue));
+                                  setEditNote(entry.note ?? '');
                                   setEditError(null);
                                 }}
                                 className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1"

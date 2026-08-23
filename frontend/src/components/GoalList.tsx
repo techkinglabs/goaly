@@ -10,7 +10,7 @@ interface GoalListProps {
   entries: DailyEntry[];
 }
 
-const calculateProgress = (goal: Goal, entries: WeeklyEntry[]): number => {
+const calculateProgress = (goal: Goal, entries: DailyEntry[]): number => {
   if (!goal.targetValue || goal.targetValue === 0) return 0;
   const goalEntries = entries.filter((entry) => entry.goalId === goal.id);
   const totalActual = goalEntries.reduce((sum, entry) => sum + (entry.actualValue ?? 0), 0);

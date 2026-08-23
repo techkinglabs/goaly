@@ -25,7 +25,7 @@ function App() {
 
   const [goalFilter, setGoalFilter] = useState<'all' | 'active' | 'inactive'>('active');
 
-  const [chartRange, setChartRange] = useState<string>('all');
+  const [chartRange, setChartRange] = useState<string>('week');
 
   const selectedGoal = goals.find((g) => g.id === selectedGoalId) ?? null;
 
@@ -163,6 +163,7 @@ function App() {
     goalId: number;
     entryDate: string;
     actualValue: number;
+    note?: string | null;
   }) => {
     try {
       const savedEntry: DailyEntry = await apiSend<DailyEntry>('/api/entries', 'POST', entryData);
@@ -186,7 +187,7 @@ function App() {
     }
   };
 
-  const handleInlineEntryUpdate = async (id: number, updates: { goalId: number; entryDate: string; actualValue: number; targetValue: number }) => {
+  const handleInlineEntryUpdate = async (id: number, updates: { goalId: number; entryDate: string; actualValue: number; targetValue: number; note?: string | null }) => {
     try {
       const savedEntry: DailyEntry = await apiSend<DailyEntry>(`/api/entries/${id}`, 'PUT', updates);
       setEntries((prev) => prev.map((entry) => (entry.id === savedEntry.id ? savedEntry : entry)));
@@ -210,7 +211,7 @@ function App() {
     }
   };
 
-  const handleEditEntry = (entry: WeeklyEntry) => {
+  const handleEditEntry = (entry: DailyEntry) => {
     setEditingEntry(entry);
   };
 

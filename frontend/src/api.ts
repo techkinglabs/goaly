@@ -1,9 +1,5 @@
 export const API_BASE: string =
-  import.meta.env.VITE_API_URL && import.meta.env.VITE_API_URL.trim() !== ''
-    ? import.meta.env.VITE_API_URL
-    : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'http://localhost:8081'
-        : '/api');
+  (import.meta.env.VITE_API_URL?.trim() || '').replace(/\/+$/, '');
 
 export function formatDate(value: string | Date): string {
   const d = typeof value === 'string' ? new Date(value) : value;

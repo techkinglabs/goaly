@@ -31,8 +31,19 @@ const DatePicker: React.FC<DatePickerProps> = ({
   autoFocus,
 }) => {
   const [open, setOpen] = useState(false);
+  const [openUp, setOpenUp] = useState(false);
   const [view, setView] = useState<Date>(value ? new Date(value) : new Date());
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const toggleOpen = () => {
+    if (!open && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      // Open upward if there's not enough room below for the ~300px calendar
+      setOpenUp(spaceBelow < 320);
+    }
+    setOpen((o) => !o);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -69,12 +80,12 @@ const DatePicker: React.FC<DatePickerProps> = ({
       <button
         type="button"
         className="form-input w-full text-left"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => toggleOpen()}
       >
         {selected ? formatDate(selected) : 'Select date'}
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 p-3 surface rounded-xl border border-[var(--border)] shadow-lg" style={{ backgroundColor: 'var(--bg-elevated)' }}>
+        <div className={`absolute z-50 ${openUp ? 'bottom-full mb-1' : 'mt-1'} p-3 surface rounded-xl border border-[var(--border)] shadow-lg`} style={{ backgroundColor: 'var(--bg-elevated)' }}>
           <div className="flex items-center justify-between mb-2">
             <button
               type="button"

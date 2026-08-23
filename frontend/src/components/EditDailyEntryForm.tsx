@@ -19,6 +19,7 @@ const EditDailyEntryForm: React.FC<EditDailyEntryFormProps> = ({
   const [entryDate, setEntryDate] = useState('');
   const [actualValue, setActualValue] = useState<number | ''>('');
   const [targetValue, setTargetValue] = useState<number | ''>('');
+  const [note, setNote] = useState<string>('');
 
   useEffect(() => {
     if (entry) {
@@ -26,6 +27,7 @@ const EditDailyEntryForm: React.FC<EditDailyEntryFormProps> = ({
       setEntryDate(entry.entryDate);
       setActualValue(entry.actualValue);
       setTargetValue(entry.targetValue);
+      setNote(entry.note ?? '');
     }
   }, [entry]);
 
@@ -41,7 +43,8 @@ const EditDailyEntryForm: React.FC<EditDailyEntryFormProps> = ({
       goalId: Number(selectedGoalId),
       entryDate,
       actualValue: Number(actualValue),
-      targetValue: Number(targetValue)
+      targetValue: Number(targetValue),
+      note: note.trim() || null
     });
   };
 

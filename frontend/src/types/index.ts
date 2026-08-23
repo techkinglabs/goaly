@@ -25,6 +25,7 @@ export interface DailyEntry {
   entryDate: string;
   actualValue: number;
   targetValue: number;
+  note?: string | null;
 }
 
 export interface ChartDataResponse {

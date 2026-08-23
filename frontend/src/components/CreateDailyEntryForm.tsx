@@ -8,6 +8,7 @@ interface CreateDailyEntryFormProps {
         goalId: number;
         entryDate: string;
         actualValue: number;
+        note?: string | null;
     }) => void;
 }
 
@@ -18,10 +19,14 @@ const CreateDailyEntryForm: React.FC<CreateDailyEntryFormProps> = ({
     const [goalId, setGoalId] = useState<number | ''>('');
     const [entryDate, setEntryDate] = useState('');
     const [actualValue, setActualValue] = useState('');
+    const [note, setNote] = useState('');
 
     useEffect(() => {
-        const today = new Date().toISOString().split('T')[0];
-        setEntryDate(today);
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        setEntryDate(`${y}-${m}-${d}`);
         if (goals.length > 0 && goalId === '') {
             setGoalId(goals[0].id);
         }
@@ -39,9 +44,11 @@ const CreateDailyEntryForm: React.FC<CreateDailyEntryFormProps> = ({
             goalId: Number(goalId),
             entryDate,
             actualValue: Number(actualValue),
+            note: note.trim() || null,
         });
 
         setActualValue('');
+        setNote('');
     };
 
     return (
@@ -95,6 +102,19 @@ const CreateDailyEntryForm: React.FC<CreateDailyEntryFormProps> = ({
                     onChange={(e) => setActualValue(e.target.value)}
                     className="form-input"
                     required
+                />
+            </div>
+
+            <div className="mb-4">
+                <label className="form-label">
+                    Note (optional)
+                </label>
+
+                <textarea
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    className="form-input"
+                    rows={3}
                 />
             </div>
 
