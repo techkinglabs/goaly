@@ -8,6 +8,7 @@ import org.example.repository.TargetHistoryRepository;
 import org.example.repository.DailyEntryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -63,6 +64,7 @@ public class GoalService {
         return goalRepository.save(goal);
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public void deleteGoal(Long id) {
         Goal goal = goalRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));

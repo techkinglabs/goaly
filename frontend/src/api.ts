@@ -5,6 +5,15 @@ export const API_BASE: string =
         ? 'http://localhost:8081'
         : '/api');
 
+export function formatDate(value: string | Date): string {
+  const d = typeof value === 'string' ? new Date(value) : value;
+  if (isNaN(d.getTime())) return String(value);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}/${m}/${day}`;
+}
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {

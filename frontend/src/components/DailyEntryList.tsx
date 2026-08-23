@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import type { Goal, DailyEntry } from '../types';
+import { formatDate } from '../api';
 
 interface DailyEntryListProps {
   entries: DailyEntry[];
@@ -45,7 +46,7 @@ const DailyEntryList: React.FC<DailyEntryListProps> = ({
               <tr key={entry.id}>
                 <td className="whitespace-nowrap">{getGoalName(entry.goalId)}</td>
 
-                <td className="whitespace-nowrap">{new Date(entry.entryDate).toLocaleDateString()}</td>
+                <td className="whitespace-nowrap">{formatDate(entry.entryDate)}</td>
 
                 <td className="whitespace-nowrap">{entry.actualValue}</td>
 

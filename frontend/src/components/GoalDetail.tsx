@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Goal, DailyEntry, TargetHistoryEntry } from '../types';
-import { addTargetHistory, updateTargetHistory, deleteTargetHistory, apiGet } from '../api';
+import { addTargetHistory, updateTargetHistory, deleteTargetHistory, apiGet, formatDate } from '../api';
+import DatePicker from './DatePicker';
 import {
   LineChart,
   Line,
@@ -77,8 +78,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
   const tooltipBg = isDarkMode ? '#1f2937' : '#f7faff';
   const tooltipBorder = isDarkMode ? '#374151' : '#b8cdf0';
   const tooltipText = isDarkMode ? '#f9fafb' : '#0f172a';
-  const [range, setRange] = useState<'7d' | '30d' | 'week' | 'all'>('all');
-  const [anchor, setAnchor] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [range, setRange] = useState<'7d' | '30d' | '365d' | 'week' | 'year' | 'all'>('all');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [newValidFrom, setNewValidFrom] = useState('');
   const [newValidTo, setNewValidTo] = useState('');
@@ -116,50 +116,109 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
     return [...goalEntries].sort((a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime());
   }, [goalEntries]);
 
-  const rangeFilteredEntries = useMemo(() => {
-    const anchorDate = anchor ? new Date(anchor) : new Date();
-    let from: Date | null = null;
+  const rangeFrom = useMemo((): Date | null => {
+    if (range === 'all') return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     if (range === '7d') {
-      from = new Date(anchorDate);
-      from.setDate(from.getDate() - 6);
-    } else if (range === '30d') {
-      from = new Date(anchorDate);
-      from.setDate(from.getDate() - 29);
-    } else if (range === 'week') {
-      const d = new Date(anchorDate);
+      const d = new Date(today);
+      d.setDate(d.getDate() - 6);
+      return d;
+    }
+    if (range === '30d') {
+      const d = new Date(today);
+      d.setDate(d.getDate() - 29);
+      return d;
+    }
+    if (range === '365d') {
+      const d = new Date(today);
+      d.setDate(d.getDate() - 364);
+      return d;
+    }
+    if (range === 'week') {
+      const d = new Date(today);
       const day = (d.getDay() + 6) % 7;
       d.setDate(d.getDate() - day);
-      from = d;
+      return d;
     }
-    return goalEntries.filter(e => {
-      const d = new Date(e.entryDate);
-      if (d > anchorDate) return false;
-      if (from && d < from) return false;
-      return true;
-    });
-  }, [goalEntries, range, anchor]);
+    if (range === 'year') {
+      return new Date(today.getFullYear(), 0, 1);
+    }
+    return null;
+  }, [range]);
 
   const chartData = useMemo(() => {
-    if (!rangeFilteredEntries.length) return [];
-
     const target = goal.targetValue > 0 ? goal.targetValue : 1;
-    let runningTotal = 0;
 
-    return rangeFilteredEntries.map((entry) => {
-      const progress = (entry.actualValue / target) * 100;
+    if (rangeFrom === null) {
+      let runningTotal = 0;
+      return goalEntries.map((entry) => {
+        const progress = (entry.actualValue / target) * 100;
+        runningTotal += entry.actualValue;
+        const totalProgress = (runningTotal / target) * 100;
+        return {
+          entryDate: entry.entryDate,
+          progress: Math.round(progress * 10) / 10,
+          progressRaw: entry.actualValue,
+          totalProgress: Math.round(totalProgress * 10) / 10,
+          totalRaw: runningTotal,
+        };
+      });
+    }
 
-      runningTotal += entry.actualValue;
-      const totalProgress = (runningTotal / target) * 100;
+    const from = new Date(rangeFrom);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-      return {
-        entryDate: entry.entryDate,
-        progress: Math.round(progress * 10) / 10,
-        progressRaw: entry.actualValue,
-        totalProgress: Math.round(totalProgress * 10) / 10,
-        totalRaw: runningTotal,
-      };
-    });
-  }, [rangeFilteredEntries, goal]);
+    const entriesByDate = new Map<string, DailyEntry>();
+    goalEntries.forEach((e) => entriesByDate.set(e.entryDate, e));
+
+    const runningBefore = goalEntries
+      .filter((e) => new Date(e.entryDate) < from)
+      .reduce((sum, e) => sum + e.actualValue, 0);
+
+    const points: Array<{
+      entryDate: string;
+      progress: number;
+      progressRaw: number;
+      totalProgress: number;
+      totalRaw: number;
+    }> = [];
+
+    let runningTotal = runningBefore;
+    for (let d = new Date(from); d <= today; d.setDate(d.getDate() + 1)) {
+      const key = d.toISOString().split('T')[0];
+      const entry = entriesByDate.get(key);
+      if (entry) {
+        const progress = (entry.actualValue / target) * 100;
+        runningTotal += entry.actualValue;
+        const totalProgress = (runningTotal / target) * 100;
+        points.push({
+          entryDate: key,
+          progress: Math.round(progress * 10) / 10,
+          progressRaw: entry.actualValue,
+          totalProgress: Math.round(totalProgress * 10) / 10,
+          totalRaw: runningTotal,
+        });
+      } else {
+        const totalProgress = (runningTotal / target) * 100;
+        points.push({
+          entryDate: key,
+          progress: 0,
+          progressRaw: 0,
+          totalProgress: Math.round(totalProgress * 10) / 10,
+          totalRaw: runningTotal,
+        });
+      }
+    }
+
+    return points;
+  }, [goalEntries, rangeFrom, goal]);
+
+  const maxTotalRaw = useMemo(() => {
+    if (!chartData.length) return 0;
+    return chartData.reduce((m, d) => Math.max(m, d.totalRaw), 0);
+  }, [chartData]);
 
   const percentDomainMax = useMemo(() => {
     const max = chartData.reduce((m, d) => Math.max(m, d.totalProgress, d.progress), 0);
@@ -179,6 +238,42 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
   const progressPercentage = goal.targetValue > 0 ? (totalActual / goal.targetValue) * 100 : 0;
 
   const derived = derivePeriodTargets(goal);
+
+  const delivered = useMemo(() => {
+    const target = goal.targetValue > 0 ? goal.targetValue : 0;
+    return {
+      actual: totalActual,
+      target,
+      percent: target > 0 ? (totalActual / target) * 100 : 0,
+      hit: target > 0 && totalActual >= target,
+    };
+  }, [totalActual, goal.targetValue]);
+
+  const weeklyChange = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const day = (now.getDay() + 6) % 7;
+    const thisWeekStart = new Date(now);
+    thisWeekStart.setDate(now.getDate() - day);
+    const lastWeekStart = new Date(thisWeekStart);
+    lastWeekStart.setDate(thisWeekStart.getDate() - 7);
+
+    const sumRange = (start: Date, end: Date) =>
+      goalEntries
+        .filter((e) => {
+          const d = new Date(e.entryDate);
+          return d >= start && d < end;
+        })
+        .reduce((s, e) => s + e.actualValue, 0);
+
+    const thisWeek = sumRange(thisWeekStart, now);
+    const lastWeek = sumRange(lastWeekStart, thisWeekStart);
+
+    if (lastWeek === 0) {
+      return { thisWeek, lastWeek, changePct: thisWeek > 0 ? 100 : 0, hasChange: thisWeek > 0 };
+    }
+    return { thisWeek, lastWeek, changePct: ((thisWeek - lastWeek) / lastWeek) * 100, hasChange: true };
+  }, [goalEntries]);
 
   const handleAddTarget = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,7 +308,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <div className="stat-tile">
             <p className="text-sm text-[var(--text-muted)]">Status</p>
             <p className={`text-xl font-semibold ${goal.isActive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -223,6 +318,14 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
           <div className="stat-tile">
             <p className="text-sm text-[var(--text-muted)]">Progress</p>
             <p className="text-xl font-semibold text-[var(--text-primary)]">{progressPercentage.toFixed(1)}%</p>
+            <p className="text-xs text-[var(--text-muted)] mt-1">Calculated from weekly target ({derived.week?.toFixed(1)} {goal.unit}/wk)</p>
+          </div>
+          <div className="stat-tile">
+            <p className="text-sm text-[var(--text-muted)]">Delivered Target</p>
+            <p className="text-xl font-semibold text-[var(--text-primary)]">{delivered.actual.toFixed(1)} / {delivered.target} {goal.unit}</p>
+            <p className={`text-xs mt-1 ${delivered.hit ? 'text-green-600 dark:text-green-400' : 'text-[var(--text-muted)]'}`}>
+              {delivered.percent.toFixed(1)}% of target {delivered.hit ? '— Target reached ✅' : '— Not reached yet'}
+            </p>
           </div>
           <div className="stat-tile">
             <p className="text-sm text-[var(--text-muted)]">Current Target</p>
@@ -231,6 +334,31 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
           <div className="stat-tile">
             <p className="text-sm text-[var(--text-muted)]">Period</p>
             <p className="text-xl font-semibold text-[var(--text-primary)]">{PERIOD_LABELS[goal.period ?? 'WEEK'] || goal.period}</p>
+          </div>
+        </div>
+
+        <div className="stat-tile mb-6">
+          <p className="text-sm text-[var(--text-muted)] mb-2">Weekly Change</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+            <div>
+              <p className="text-xs text-[var(--text-muted)]">This Week</p>
+              <p className="text-lg font-semibold text-[var(--text-primary)]">{weeklyChange.thisWeek.toFixed(1)} {goal.unit}</p>
+            </div>
+            <div>
+              <p className="text-xs text-[var(--text-muted)]">Last Week</p>
+              <p className="text-lg font-semibold text-[var(--text-primary)]">{weeklyChange.lastWeek.toFixed(1)} {goal.unit}</p>
+            </div>
+            <div>
+              <p className="text-xs text-[var(--text-muted)]">Change</p>
+              {weeklyChange.hasChange ? (
+                <p className={`text-lg font-semibold ${weeklyChange.changePct >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                  {weeklyChange.changePct >= 0 ? '+' : ''}{weeklyChange.changePct.toFixed(1)}%
+                  <span className="text-xs font-normal"> ({weeklyChange.changePct >= 0 ? 'more' : 'less'} than last week)</span>
+                </p>
+              ) : (
+                <p className="text-lg font-semibold text-[var(--text-primary)]">—</p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -258,25 +386,19 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
         <div className="flex flex-wrap items-center justify-between mb-2">
           <h3 className="text-lg font-medium text-[var(--text-primary)]">Progress Trend</h3>
           <div className="flex flex-wrap gap-2">
-            {(['7d', '30d', 'week', 'all'] as const).map((r) => (
+            {(['7d', '30d', '365d', 'week', 'year', 'all'] as const).map((r) => (
               <button
                 key={r}
                 onClick={() => setRange(r)}
                 className={range === r ? 'btn btn-primary' : 'btn btn-secondary'}
               >
-                {r === '7d' ? 'Last 7 days' : r === '30d' ? 'Last 30 days' : r === 'week' ? 'This Week' : 'All'}
+                {r === '7d' ? 'Last 7 days' : r === '30d' ? 'Last 30 days' : r === '365d' ? 'Last 365 days' : r === 'week' ? 'This Week' : r === 'year' ? 'This Year' : 'All'}
               </button>
             ))}
-            <input
-              type="date"
-              value={anchor}
-              onChange={(e) => setAnchor(e.target.value)}
-              className="form-input !mb-0 w-auto"
-            />
           </div>
         </div>
         {chartData.length > 0 ? (
-          <div className="h-64">
+          <div className="h-128">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={chartData}
@@ -299,8 +421,8 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                   yAxisId="raw"
                   orientation="right"
                   className={isDarkMode ? 'dark:fill-gray-300' : 'fill-slate-500'}
-                  domain={[0, goal.targetValue]}
-                  ticks={[0, goal.targetValue / 4, goal.targetValue / 2, (goal.targetValue * 3) / 4, goal.targetValue]}
+                  domain={[0, Math.max(goal.targetValue, maxTotalRaw)]}
+                  ticks={[0, goal.targetValue / 4, goal.targetValue / 2, (goal.targetValue * 3) / 4, goal.targetValue, Math.max(goal.targetValue, maxTotalRaw)]}
                   tickFormatter={(value) => `${value} ${goal.unit}`}
                 />
 
@@ -382,21 +504,19 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
                 <label className="form-label">Valid From</label>
-                <input
-                  type="date"
+                <DatePicker
                   value={newValidFrom}
-                  onChange={(e) => setNewValidFrom(e.target.value)}
+                  onChange={setNewValidFrom}
                   className="form-input !mb-0"
                   required
                 />
               </div>
               <div>
                 <label className="form-label">Valid To (optional)</label>
-                <input
-                  type="date"
+                <DatePicker
                   value={newValidTo}
+                  onChange={setNewValidTo}
                   min={newValidFrom || undefined}
-                  onChange={(e) => setNewValidTo(e.target.value)}
                   className="form-input !mb-0"
                 />
               </div>
@@ -404,7 +524,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                 <label className="form-label">New Value ({goal.unit})</label>
                 <input
                   type="number"
-                  step="0.01"
+                  step="1"
                   value={historyNewValue}
                   onChange={(e) => setHistoryNewValue(e.target.value)}
                   className="form-input !mb-0"
@@ -468,35 +588,33 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                     <tr key={h.id}>
                       {isEditing ? (
                         <td className="whitespace-nowrap text-sm p-1">
-                          <input
-                            type="date"
+                          <DatePicker
                             value={editHistoryFrom}
-                            onChange={(e) => setEditHistoryFrom(e.target.value)}
+                            onChange={setEditHistoryFrom}
                             className="form-input !mb-0 w-full"
                           />
                         </td>
                       ) : (
-                        <td className="whitespace-nowrap text-sm">{new Date(h.validFrom).toLocaleDateString()}</td>
+                        <td className="whitespace-nowrap text-sm">{formatDate(h.validFrom)}</td>
                       )}
                       {isEditing ? (
                         <td className="whitespace-nowrap text-sm p-1">
-                          <input
-                            type="date"
+                          <DatePicker
                             value={editHistoryTo}
+                            onChange={setEditHistoryTo}
                             min={editHistoryFrom || undefined}
-                            onChange={(e) => setEditHistoryTo(e.target.value)}
                             className="form-input !mb-0 w-full"
                           />
                         </td>
                       ) : (
-                        <td className="whitespace-nowrap text-sm">{h.validTo ? new Date(h.validTo).toLocaleDateString() : 'Forever'}</td>
+                        <td className="whitespace-nowrap text-sm">{h.validTo ? formatDate(h.validTo) : 'Forever'}</td>
                       )}
                       {isEditing ? (
                         <td className="whitespace-nowrap text-sm p-1 space-y-1">
                           <div className="flex gap-1">
                             <input
                               type="number"
-                              step="0.01"
+                              step="1"
                               value={editHistoryValue}
                               onChange={(e) => setEditHistoryValue(e.target.value)}
                               className="form-input !mb-0 w-20"
@@ -646,10 +764,9 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
               {isAdding && (
                 <tr>
                   <td className="whitespace-nowrap text-sm p-1">
-                    <input
-                      type="date"
+                    <DatePicker
                       value={newDate}
-                      onChange={(e) => setNewDate(e.target.value)}
+                      onChange={setNewDate}
                       className="form-input !mb-0 w-full"
                       autoFocus
                     />
@@ -711,15 +828,14 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                     <tr key={entry.id}>
                       {isEditing ? (
                         <td className="whitespace-nowrap text-sm p-1">
-                          <input
-                            type="date"
+                          <DatePicker
                             value={editDate}
-                            onChange={(e) => setEditDate(e.target.value)}
+                            onChange={setEditDate}
                             className="form-input !mb-0 w-full"
                           />
                         </td>
                       ) : (
-                        <td className="whitespace-nowrap text-sm">{entry.entryDate}</td>
+                        <td className="whitespace-nowrap text-sm">{formatDate(entry.entryDate)}</td>
                       )}
                       {isEditing ? (
                         <td className="whitespace-nowrap text-sm p-1">

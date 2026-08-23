@@ -75,6 +75,9 @@ const ChartView: React.FC<ChartViewProps> = ({ data, isDarkMode, goals = [] }) =
           ))}
         </select>
       </div>
+      {data.length === 0 ? (
+        <p className="text-[var(--text-muted)]">No progress data available</p>
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="surface !mb-0 rounded-xl p-6">
           <h3 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">Progress Over Time</h3>
@@ -137,6 +140,7 @@ const ChartView: React.FC<ChartViewProps> = ({ data, isDarkMode, goals = [] }) =
           </ResponsiveContainer>
         </div>
       </div>
+      )}
     </div>
   );
 };

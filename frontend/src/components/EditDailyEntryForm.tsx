@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { DailyEntry } from '../types';
+import DatePicker from './DatePicker';
 
 interface EditDailyEntryFormProps {
   entry?: DailyEntry;
@@ -70,12 +71,10 @@ const EditDailyEntryForm: React.FC<EditDailyEntryFormProps> = ({
         <label className="form-label" htmlFor="entryDate">
           Entry Date
         </label>
-        <input
-          id="entryDate"
-          type="date"
+        <DatePicker
           value={entryDate}
-          onChange={(e) => setEntryDate(e.target.value)}
-          className="form-input"
+          onChange={setEntryDate}
+          className="form-input !mb-0"
           required
         />
       </div>
@@ -87,7 +86,7 @@ const EditDailyEntryForm: React.FC<EditDailyEntryFormProps> = ({
         <input
           id="actualValue"
           type="number"
-          step="0.01"
+          step="1"
           value={actualValue}
           onChange={(e) => setActualValue(e.target.value ? Number(e.target.value) : '')}
           className="form-input"
@@ -102,7 +101,7 @@ const EditDailyEntryForm: React.FC<EditDailyEntryFormProps> = ({
           <input
             id="targetValue"
             type="number"
-            step="0.01"
+            step="1"
             value={targetValue}
             onChange={(e) => setTargetValue(e.target.value ? Number(e.target.value) : '')}
             readOnly

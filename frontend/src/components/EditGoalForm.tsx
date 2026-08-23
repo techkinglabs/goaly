@@ -160,7 +160,7 @@ const EditGoalForm: React.FC<EditGoalFormProps> = ({ goal, onSubmit, onCancel })
         <input
           id="amountPerPeriod"
           type="number"
-          step="0.01"
+          step="1"
           value={amountPerPeriod}
           onChange={(e) => setAmountPerPeriod(e.target.value ? Number(e.target.value) : '')}
           placeholder="Defaults to Target Value if empty"

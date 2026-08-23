@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Goal } from '../types';
+import DatePicker from './DatePicker';
 
 interface CreateDailyEntryFormProps {
     goals: Goal[];
@@ -74,11 +75,10 @@ const CreateDailyEntryForm: React.FC<CreateDailyEntryFormProps> = ({
                     Entry Date
                 </label>
 
-                <input
-                    type="date"
+                <DatePicker
                     value={entryDate}
-                    onChange={(e) => setEntryDate(e.target.value)}
-                    className="form-input"
+                    onChange={setEntryDate}
+                    className="form-input !mb-0"
                     required
                 />
             </div>
@@ -90,7 +90,7 @@ const CreateDailyEntryForm: React.FC<CreateDailyEntryFormProps> = ({
 
                 <input
                     type="number"
-                    step="0.01"
+                    step="1"
                     value={actualValue}
                     onChange={(e) => setActualValue(e.target.value)}
                     className="form-input"

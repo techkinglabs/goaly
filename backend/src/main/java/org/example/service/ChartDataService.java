@@ -47,6 +47,29 @@ public class ChartDataService {
         Map<LocalDate, Map<String, Object>> groupedData = new LinkedHashMap<>();
         Map<Long, Double> runningActual = new HashMap<>();
 
+        // Seed the running cumulative total with entries that fall before the range
+        // so the cumulative line stays correct for the first pre-filled buckets.
+        if (from != null) {
+            entries.stream()
+                    .filter(e -> e.getEntryDate().isBefore(from))
+                    .forEach(e -> runningActual.merge(e.getGoalId(), e.getActualValue().doubleValue(), Double::sum));
+
+            // Pre-fill every bucket in the bounded range so the x-axis is always full length.
+            if (weekly) {
+                LocalDate bucket = startOfWeek(from);
+                while (!bucket.isAfter(to)) {
+                    ensureBucket(bucket, groupedData, goalTargets, runningActual, weekly);
+                    bucket = bucket.plusWeeks(1);
+                }
+            } else {
+                LocalDate bucket = from;
+                while (!bucket.isAfter(to)) {
+                    ensureBucket(bucket, groupedData, goalTargets, runningActual, weekly);
+                    bucket = bucket.plusDays(1);
+                }
+            }
+        }
+
         List<DailyEntry> filtered = entries.stream()
                 .filter(e -> !e.getEntryDate().isAfter(to))
                 .filter(e -> from == null || !e.getEntryDate().isBefore(from))
@@ -85,8 +108,12 @@ public class ChartDataService {
                 return anchor.minusDays(6);
             case "30d":
                 return anchor.minusDays(29);
+            case "365d":
+                return anchor.minusDays(364);
             case "week":
                 return startOfWeek(anchor);
+            case "year":
+                return LocalDate.now().withDayOfYear(1);
             case "all":
             default:
                 return null;
@@ -95,6 +122,24 @@ public class ChartDataService {
 
     private LocalDate startOfWeek(LocalDate date) {
         return date.with(DayOfWeek.MONDAY);
+    }
+
+    private void ensureBucket(LocalDate bucket, Map<LocalDate, Map<String, Object>> groupedData,
+                              Map<Long, Double> goalTargets, Map<Long, Double> runningActual, boolean weekly) {
+        groupedData.putIfAbsent(bucket, new LinkedHashMap<>());
+        Map<String, Object> bucketData = groupedData.get(bucket);
+
+        for (Map.Entry<Long, Double> t : goalTargets.entrySet()) {
+            long id = t.getKey();
+            double target = t.getValue();
+            double running = runningActual.getOrDefault(id, 0.0);
+            double totalProgress = (target == 0.0) ? 0.0 : (running / target) * 100.0;
+
+            bucketData.putIfAbsent("goal_" + id, 0.0);
+            bucketData.put("total_" + id, totalProgress);
+            bucketData.put("target_" + id, goalService.getEffectiveTarget(id, bucket).doubleValue());
+        }
+        bucketData.putIfAbsent(weekly ? "weekStart" : "entryDate", bucket.toString());
     }
 
     private double calculatePercentage(DailyEntry entry) {

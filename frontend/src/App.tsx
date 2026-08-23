@@ -26,7 +26,6 @@ function App() {
   const [goalFilter, setGoalFilter] = useState<'all' | 'active' | 'inactive'>('active');
 
   const [chartRange, setChartRange] = useState<string>('all');
-  const [chartAnchor, setChartAnchor] = useState<string>(new Date().toISOString().split('T')[0]);
 
   const selectedGoal = goals.find((g) => g.id === selectedGoalId) ?? null;
 
@@ -392,21 +391,15 @@ function App() {
                 <div className="flex flex-wrap items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold">Progress Charts</h2>
                   <div className="flex flex-wrap gap-2 items-center">
-                    {(['7d', '30d', 'week', 'all'] as const).map((r) => (
+                    {(['7d', '30d', '365d', 'week', 'year', 'all'] as const).map((r) => (
                       <button
                         key={r}
-                        onClick={() => { setChartRange(r); refreshChart(r, chartAnchor); }}
+                        onClick={() => { setChartRange(r); refreshChart(r, ''); }}
                         className={chartRange === r ? 'btn btn-primary' : 'btn btn-secondary'}
                       >
-                        {r === '7d' ? 'Last 7 days' : r === '30d' ? 'Last 30 days' : r === 'week' ? 'This Week' : 'All'}
+                        {r === '7d' ? 'Last 7 days' : r === '30d' ? 'Last 30 days' : r === '365d' ? 'Last 365 days' : r === 'week' ? 'This Week' : r === 'year' ? 'This Year' : 'All'}
                       </button>
                     ))}
-                    <input
-                      type="date"
-                      value={chartAnchor}
-                      onChange={(e) => { setChartAnchor(e.target.value); refreshChart(chartRange, e.target.value); }}
-                      className="form-input !mb-0 w-auto"
-                    />
                   </div>
                 </div>
                 <ChartView data={chartData} isDarkMode={isDarkMode} goals={goals} />
