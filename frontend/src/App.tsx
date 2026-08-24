@@ -20,6 +20,7 @@ function App() {
   const [loading, setLoading] = useState<boolean>(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(true); // Default to dark mode
   const [showCreateGoalModal, setShowCreateGoalModal] = useState(false);
+  const [showCreateEntryModal, setShowCreateEntryModal] = useState(false);
   const [error, setError] = useState<string | null>(null); // Global error state
   const [selectedGoalId, setSelectedGoalId] = useState<number | null>(null); // For Jira-style detail view
 
@@ -225,7 +226,7 @@ function App() {
   };
 
   return (
-    <div className={isDarkMode ? 'dark min-h-screen' : 'min-h-screen'}>
+    <div className={isDarkMode ? 'dark min-h-screen flex flex-col' : 'min-h-screen flex flex-col'}>
       <header className="header">
         <div className="container-app flex justify-between items-center">
           <h1 className="text-2xl font-bold">Personal Progress Tracker</h1>
@@ -274,7 +275,7 @@ function App() {
       </div>
     </nav>
 
-      <main className="container-app py-8">
+      <main className="container-app py-8 flex-grow">
         {error && (
           <div className="alert alert-danger" role="alert">
             <p>{error}</p>
@@ -364,9 +365,18 @@ function App() {
 
             {activeTab === 'entries' && (
               <div>
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
                   <h2 className="text-xl font-semibold">Daily Entries</h2>
-                  <CreateDailyEntryForm goals={goals} onSubmit={handleEntrySubmit} />
+                  <button
+                    onClick={() => setShowCreateEntryModal(true)}
+                    className="btn btn-primary flex items-center justify-center"
+                    aria-label="Add Entry"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+                    </svg>
+                    Add
+                  </button>
                 </div>
 
                 {editingEntry ? (
@@ -412,7 +422,12 @@ function App() {
 
       {/* Create Goal Modal */}
       {showCreateGoalModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          tabIndex={-1}
+          autoFocus
+          onKeyDown={(e) => { if (e.key === 'Escape') setShowCreateGoalModal(false); }}
+        >
           <div className="surface rounded-xl shadow-lg w-full max-w-md border border-[var(--border)]" style={{ backgroundColor: 'var(--bg-elevated)' }}>
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
@@ -435,7 +450,37 @@ function App() {
         </div>
       )}
 
-      <footer className="footer mt-8 py-6">
+      {/* Create Entry Modal */}
+      {showCreateEntryModal && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          tabIndex={-1}
+          autoFocus
+          onKeyDown={(e) => { if (e.key === 'Escape') setShowCreateEntryModal(false); }}
+        >
+          <div className="surface rounded-xl shadow-lg w-full max-w-md border border-[var(--border)]" style={{ backgroundColor: 'var(--bg-elevated)' }}>
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Add Entry</h3>
+                <button
+                  onClick={() => setShowCreateEntryModal(false)}
+                  className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <CreateDailyEntryForm goals={goals} onSubmit={(entryData) => {
+                handleEntrySubmit(entryData);
+                setShowCreateEntryModal(false);
+              }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <footer className="footer mt-auto py-6">
         <div className="container-app text-center">
           <p>Personal Progress Tracker &copy; {new Date().getFullYear()}</p>
         </div>

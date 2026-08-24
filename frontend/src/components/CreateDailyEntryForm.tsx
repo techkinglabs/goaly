@@ -54,12 +54,8 @@ const CreateDailyEntryForm: React.FC<CreateDailyEntryFormProps> = ({
     return (
         <form
             onSubmit={handleSubmit}
-            className="surface !mb-0 rounded-xl p-6 w-full max-w-md"
+            className="surface !mb-0 rounded-xl p-0 w-full max-w-md border-0"
         >
-            <h3 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">
-                Add Entry
-            </h3>
-
             <div className="mb-4">
                 <label className="form-label">
                     Goal

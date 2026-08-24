@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import type { Goal, DailyEntry, TargetHistoryEntry } from '../types';
 import { addTargetHistory, updateTargetHistory, deleteTargetHistory, apiGet, formatDate } from '../api';
 import DatePicker from './DatePicker';
+import ChartCard from './ChartCard';
 
 // Local-date key (YYYY-MM-DD) without UTC shift — toISOString() would shift by timezone.
 const toLocalISO = (d: Date): string => {
@@ -9,6 +10,11 @@ const toLocalISO = (d: Date): string => {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+};
+
+const parseLocalDate = (s: string): Date => {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
 };
 import {
   LineChart,
@@ -198,7 +204,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
     goalEntries.forEach((e) => entriesByDate.set(e.entryDate, (entriesByDate.get(e.entryDate) ?? 0) + e.actualValue));
 
     const runningBefore = goalEntries
-      .filter((e) => new Date(e.entryDate) < from)
+      .filter((e) => parseLocalDate(e.entryDate) < from)
       .reduce((sum, e) => sum + e.actualValue, 0);
 
     const points: Array<{
@@ -285,12 +291,14 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
     const sumRange = (start: Date, end: Date) =>
       goalEntries
         .filter((e) => {
-          const d = new Date(e.entryDate);
+          const d = parseLocalDate(e.entryDate);
           return d >= start && d < end;
         })
         .reduce((s, e) => s + e.actualValue, 0);
 
-    const thisWeek = sumRange(thisWeekStart, now);
+    const nowEnd = new Date(now);
+    nowEnd.setHours(23, 59, 59, 999);
+    const thisWeek = sumRange(thisWeekStart, nowEnd);
     const lastWeek = sumRange(lastWeekStart, thisWeekStart);
 
     if (lastWeek === 0) {
@@ -322,23 +330,40 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
 
   const PERIOD_OPTIONS: Array<'DAY' | 'WEEK' | 'MONTH' | 'YEAR'> = ['DAY', 'WEEK', 'MONTH', 'YEAR'];
 
+  const cancelAddTarget = () => {
+    setHistoryOpen(false);
+    setHistoryError(null);
+  };
+
+  const handleFormKeyDown = (
+    onEnter?: () => void,
+    onEscape?: () => void
+  ) => (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape' && onEscape) {
+      e.preventDefault();
+      onEscape();
+    } else if (e.key === 'Enter' && onEnter && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+      e.preventDefault();
+      onEnter();
+    }
+  };
+
   return (
     <div>
       <div className="pane-detail mb-6">
         <div className="flex justify-between items-start mb-4">
-          <div>
+          <div className="flex items-center gap-3">
+            <span
+              className={`inline-block w-3 h-3 rounded-full ${goal.isActive ? 'bg-green-500' : 'bg-red-500'}`}
+              title={goal.isActive ? 'Active' : 'Inactive'}
+              aria-label={goal.isActive ? 'Active' : 'Inactive'}
+            />
             <h2 className="text-2xl font-bold text-[var(--text-primary)]">{goal.name}</h2>
-            <p className="text-[var(--text-secondary)] mt-1">{goal.description || 'No description'}</p>
           </div>
+          <p className="text-[var(--text-secondary)] mt-1">{goal.description || 'No description'}</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-          <div className="stat-tile">
-            <p className="text-sm text-[var(--text-muted)]">Status</p>
-            <p className={`text-xl font-semibold ${goal.isActive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-              {goal.isActive ? 'Active' : 'Inactive'}
-            </p>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div className="stat-tile">
             <p className="text-sm text-[var(--text-muted)]">Progress</p>
             <p className="text-xl font-semibold text-[var(--text-primary)]">{progressPercentage.toFixed(1)}%</p>
@@ -351,55 +376,49 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
               {delivered.percent.toFixed(1)}% of target {delivered.hit ? '— Target reached ✅' : '— Not reached yet'}
             </p>
           </div>
-          <div className="stat-tile">
-            <p className="text-sm text-[var(--text-muted)]">Current Target</p>
-            <p className="text-xl font-semibold text-[var(--text-primary)]">{goal.targetValue} {goal.unit}</p>
-          </div>
-          <div className="stat-tile">
-            <p className="text-sm text-[var(--text-muted)]">Period</p>
-            <p className="text-xl font-semibold text-[var(--text-primary)]">{PERIOD_LABELS[goal.period ?? 'WEEK'] || goal.period}</p>
-          </div>
         </div>
 
-        <div className="stat-tile mb-6">
-          <p className="text-sm text-[var(--text-muted)] mb-2">Weekly Change</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-xs text-[var(--text-muted)]">This Week</p>
-              <p className="text-lg font-semibold text-[var(--text-primary)]">{weeklyChange.thisWeek.toFixed(1)} {goal.unit}</p>
-            </div>
-            <div>
-              <p className="text-xs text-[var(--text-muted)]">Last Week</p>
-              <p className="text-lg font-semibold text-[var(--text-primary)]">{weeklyChange.lastWeek.toFixed(1)} {goal.unit}</p>
-            </div>
-            <div>
-              <p className="text-xs text-[var(--text-muted)]">Change</p>
-              {weeklyChange.hasChange ? (
-                <p className={`text-lg font-semibold ${weeklyChange.changePct >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {weeklyChange.changePct >= 0 ? '+' : ''}{weeklyChange.changePct.toFixed(1)}%
-                  <span className="text-xs font-normal"> ({weeklyChange.changePct >= 0 ? 'more' : 'less'} than last week)</span>
-                </p>
-              ) : (
-                <p className="text-lg font-semibold text-[var(--text-primary)]">—</p>
-              )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div className="stat-tile mb-0">
+            <p className="text-sm text-[var(--text-muted)] mb-2">Weekly Change</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-xs text-[var(--text-muted)]">This Week</p>
+                <p className="text-lg font-semibold text-[var(--text-primary)]">{weeklyChange.thisWeek.toFixed(1)} {goal.unit}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[var(--text-muted)]">Last Week</p>
+                <p className="text-lg font-semibold text-[var(--text-primary)]">{weeklyChange.lastWeek.toFixed(1)} {goal.unit}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[var(--text-muted)]">Change</p>
+                {weeklyChange.hasChange ? (
+                  <p className={`text-lg font-semibold ${weeklyChange.changePct >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {weeklyChange.changePct >= 0 ? '+' : ''}{weeklyChange.changePct.toFixed(1)}%
+                    <span className="text-xs font-normal"> ({weeklyChange.changePct >= 0 ? 'more' : 'less'} than last week)</span>
+                  </p>
+                ) : (
+                  <p className="text-lg font-semibold text-[var(--text-primary)]">—</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="stat-tile mb-0">
-          <p className="text-sm text-[var(--text-muted)] mb-2">Derived Targets</p>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-xs text-[var(--text-muted)]">Per Week</p>
-              <p className="text-lg font-semibold text-[var(--text-primary)]">{derived.week?.toFixed(1)} {goal.unit}</p>
-            </div>
-            <div>
-              <p className="text-xs text-[var(--text-muted)]">Per Month</p>
-              <p className="text-lg font-semibold text-[var(--text-primary)]">{derived.month?.toFixed(1)} {goal.unit}</p>
-            </div>
-            <div>
-              <p className="text-xs text-[var(--text-muted)]">Per Year</p>
-              <p className="text-lg font-semibold text-[var(--text-primary)]">{derived.year?.toFixed(1)} {goal.unit}</p>
+          <div className="stat-tile mb-0">
+            <p className="text-sm text-[var(--text-muted)] mb-2">Derived Targets</p>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-xs text-[var(--text-muted)]">Per Week</p>
+                <p className="text-lg font-semibold text-[var(--text-primary)]">{derived.week?.toFixed(1)} {goal.unit}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[var(--text-muted)]">Per Month</p>
+                <p className="text-lg font-semibold text-[var(--text-primary)]">{derived.month?.toFixed(1)} {goal.unit}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[var(--text-muted)]">Per Year</p>
+                <p className="text-lg font-semibold text-[var(--text-primary)]">{derived.year?.toFixed(1)} {goal.unit}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -422,7 +441,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
           </div>
         </div>
         {chartData.length > 0 ? (
-          <div className="h-128">
+          <ChartCard title="Progress Trend" fullscreenHeight="80vh" hideTitle>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={chartData}
@@ -501,7 +520,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                 />
               </LineChart>
             </ResponsiveContainer>
-          </div>
+          </ChartCard>
         ) : (
           <p className="text-[var(--text-muted)]">No progress data available</p>
         )}
@@ -524,7 +543,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
         </div>
 
         {historyOpen && (
-          <form onSubmit={handleAddTarget} className="surface !mb-3 rounded-xl p-4 border border-[var(--border)]" style={{ backgroundColor: 'var(--bg-surface-sunken)' }}>
+          <form onSubmit={handleAddTarget} onKeyDown={handleFormKeyDown(undefined, cancelAddTarget)} className="surface !mb-3 rounded-xl p-4 border border-[var(--border)]" style={{ backgroundColor: 'var(--bg-surface-sunken)' }}>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
                 <label className="form-label">Valid From</label>
@@ -582,7 +601,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
               </button>
               <button
                 type="button"
-                onClick={() => { setHistoryOpen(false); setHistoryError(null); }}
+                onClick={cancelAddTarget}
                 className="btn btn-secondary"
               >
                 Cancel
@@ -606,10 +625,26 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
               </thead>
               <tbody>
                 {[...goal.targetHistory].sort((a, b) => new Date(b.validFrom).getTime() - new Date(a.validFrom).getTime()).map((h: TargetHistoryEntry) => {
-                  const isEditing = editingHistoryId === h.id;
-                  const eq = derivePeriodEquivalents(Number(h.value), h.period ?? 'WEEK');
-                  return (
-                    <tr key={h.id}>
+                   const isEditing = editingHistoryId === h.id;
+                   const eq = derivePeriodEquivalents(Number(h.value), h.period ?? 'WEEK');
+
+                   const acceptHistoryEdit = async () => {
+                     if (!editHistoryFrom) { setEditHistoryError('Date is required.'); return; }
+                     if (editHistoryValue === '' || isNaN(Number(editHistoryValue))) { setEditHistoryError('Value is required.'); return; }
+                     try {
+                       await updateTargetHistory(goal.id, h.id, editHistoryFrom, Number(editHistoryValue), editHistoryTo || null, editHistoryPeriod);
+                       const refreshed = await apiGet<Goal>(`/api/goals/${goal.id}`);
+                       if (onGoalUpdated) onGoalUpdated(refreshed);
+                       setEditingHistoryId(null);
+                       setEditHistoryError(null);
+                     } catch (err: any) {
+                       setEditHistoryError(err?.message || 'Failed to update target change.');
+                     }
+                   };
+                   const cancelHistoryEdit = () => { setEditingHistoryId(null); setEditHistoryError(null); };
+
+                   return (
+                     <tr key={h.id} onKeyDown={isEditing ? handleFormKeyDown(acceptHistoryEdit, cancelHistoryEdit) : undefined}>
                       {isEditing ? (
                         <td className="whitespace-nowrap text-sm p-1">
                           <DatePicker
@@ -668,35 +703,23 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                             {editHistoryError && (
                               <p className="text-red-600 dark:text-red-400 text-xs mb-1">{editHistoryError}</p>
                             )}
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={async () => {
-                                  if (!editHistoryFrom) { setEditHistoryError('Date is required.'); return; }
-                                  if (editHistoryValue === '' || isNaN(Number(editHistoryValue))) { setEditHistoryError('Value is required.'); return; }
-                                  try {
-                                    await updateTargetHistory(goal.id, h.id, editHistoryFrom, Number(editHistoryValue), editHistoryTo || null, editHistoryPeriod);
-                                    const refreshed = await apiGet<Goal>(`/api/goals/${goal.id}`);
-                                    if (onGoalUpdated) onGoalUpdated(refreshed);
-                                    setEditingHistoryId(null);
-                                    setEditHistoryError(null);
-                                  } catch (err: any) {
-                                    setEditHistoryError(err?.message || 'Failed to update target change.');
-                                  }
-                                }}
-                                className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 p-1"
-                                title="Accept"
-                                aria-label="Accept changes"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => { setEditingHistoryId(null); setEditHistoryError(null); }}
-                                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
-                                title="Cancel"
-                                aria-label="Cancel changes"
-                              >
+                             <div className="flex items-center gap-1">
+                               <button
+                                 onClick={acceptHistoryEdit}
+                                 className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 p-1"
+                                 title="Accept"
+                                 aria-label="Accept changes"
+                               >
+                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                 </svg>
+                               </button>
+                               <button
+                                 onClick={cancelHistoryEdit}
+                                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
+                                 title="Cancel"
+                                 aria-label="Cancel changes"
+                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
@@ -788,7 +811,18 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
             </thead>
             <tbody>
               {isAdding && (
-                <tr>
+                (() => {
+                  const acceptNewEntry = () => {
+                    if (!newDate) { setNewError('Date is required.'); return; }
+                    if (newValue === '' || isNaN(Number(newValue))) { setNewError('Value is required.'); return; }
+                    onSubmit({ goalId: goal.id, entryDate: newDate, actualValue: Number(newValue), note: newNote.trim() || null });
+                    setIsAdding(false);
+                    setNewError(null);
+                  };
+                  const cancelNewEntry = () => { setIsAdding(false); setNewError(null); };
+
+                  return (
+                <tr onKeyDown={handleFormKeyDown(acceptNewEntry, cancelNewEntry)}>
                   <td className="text-sm p-2 align-top">
                     <DatePicker
                       value={newDate}
@@ -821,13 +855,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                     )}
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => {
-                          if (!newDate) { setNewError('Date is required.'); return; }
-                          if (newValue === '' || isNaN(Number(newValue))) { setNewError('Value is required.'); return; }
-                          onSubmit({ goalId: goal.id, entryDate: newDate, actualValue: Number(newValue), note: newNote.trim() || null });
-                          setIsAdding(false);
-                          setNewError(null);
-                        }}
+                        onClick={acceptNewEntry}
                         className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 p-1"
                         title="Accept"
                         aria-label="Accept new entry"
@@ -837,7 +865,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                         </svg>
                       </button>
                       <button
-                        onClick={() => { setIsAdding(false); setNewError(null); }}
+                        onClick={cancelNewEntry}
                         className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
                         title="Reject"
                         aria-label="Reject new entry"
@@ -849,6 +877,8 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                     </div>
                   </td>
                 </tr>
+                  );
+                })()
               )}
               {recentEntries.length === 0 && !isAdding && (
                 <tr>
@@ -859,8 +889,24 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
               )}
               {recentEntries.map((entry) => {
                   const isEditing = editingId === entry.id;
+
+                  const acceptEntryEdit = () => {
+                    if (!editDate) { setEditError('Date is required.'); return; }
+                    if (editValue === '' || isNaN(Number(editValue))) { setEditError('Value is required.'); return; }
+                    onUpdateEntry?.(entry.id, {
+                      goalId: entry.goalId,
+                      entryDate: editDate,
+                      actualValue: Number(editValue),
+                      targetValue: entry.targetValue,
+                      note: editNote.trim() || null,
+                    });
+                    setEditingId(null);
+                    setEditError(null);
+                  };
+                  const cancelEntryEdit = () => { setEditingId(null); setEditError(null); };
+
                   return (
-                    <tr key={entry.id}>
+                    <tr key={entry.id} onKeyDown={isEditing ? handleFormKeyDown(acceptEntryEdit, cancelEntryEdit) : undefined}>
                       {isEditing ? (
                         <td className="whitespace-nowrap text-sm p-1">
                           <DatePicker
@@ -905,19 +951,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                             )}
                             <div className="flex items-center gap-1">
                               <button
-                                onClick={() => {
-                                  if (!editDate) { setEditError('Date is required.'); return; }
-                                  if (editValue === '' || isNaN(Number(editValue))) { setEditError('Value is required.'); return; }
-                                  onUpdateEntry?.(entry.id, {
-                                    goalId: entry.goalId,
-                                    entryDate: editDate,
-                                    actualValue: Number(editValue),
-                                    targetValue: entry.targetValue,
-                                    note: editNote.trim() || null,
-                                  });
-                                  setEditingId(null);
-                                  setEditError(null);
-                                }}
+                                onClick={acceptEntryEdit}
                                 className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 p-1"
                                 title="Accept"
                                 aria-label="Accept changes"
@@ -927,7 +961,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({ goal, goals, onSubmit, onUpdate
                                 </svg>
                               </button>
                               <button
-                                onClick={() => { setEditingId(null); setEditError(null); }}
+                                onClick={cancelEntryEdit}
                                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
                                 title="Reject"
                                 aria-label="Reject changes"
