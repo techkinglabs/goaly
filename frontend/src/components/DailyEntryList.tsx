@@ -1,22 +1,94 @@
-import React, { useState, useMemo } from 'react';
-import { Pencil, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
-import type { Goal, DailyEntry } from '../types';
-import { formatDate } from '../api';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ArrowDown, ArrowUp, Pencil, Trash2 } from 'lucide-react';
+import type { DailyEntry, Goal } from '../types';
+import { formatDate } from '../utils/date';
+import EmptyState from './ui/EmptyState';
 
 interface DailyEntryListProps {
   entries: DailyEntry[];
   goals: Goal[];
   onEdit?: (entry: DailyEntry) => void;
   onDelete?: (id: number) => void;
+  deletingEntryId?: number | null;
 }
 
 type SortKey = 'goal' | 'entryDate' | 'actualValue' | 'targetValue' | 'progress';
+
+interface EntryRowProps {
+  entry: DailyEntry;
+  goalName: string;
+  progress: number;
+  isDeleting: boolean;
+  onEdit?: (entry: DailyEntry) => void;
+  onDelete?: (id: number) => void;
+}
+
+const EntryRow = React.memo<EntryRowProps>(
+  ({ entry, goalName, progress, isDeleting, onEdit, onDelete }) => {
+    const handleEdit = useCallback(() => onEdit?.(entry), [onEdit, entry]);
+    const handleDelete = useCallback(() => onDelete?.(entry.id), [onDelete, entry.id]);
+
+    return (
+      <tr className={isDeleting ? 'opacity-50' : undefined}>
+        <td className="whitespace-nowrap">{goalName}</td>
+        <td className="whitespace-nowrap">{formatDate(entry.entryDate)}</td>
+        <td className="whitespace-nowrap">{entry.actualValue}</td>
+        <td className="whitespace-nowrap">{entry.targetValue}</td>
+        <td className="whitespace-nowrap">
+          <div className="flex items-center">
+            <div
+              className="progress-track mr-2 h-2.5 w-24"
+              role="progressbar"
+              aria-valuenow={Math.round(progress)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div
+                className="h-2.5 rounded-full bg-blue-600"
+                style={{ width: `${Math.min(progress, 100)}%` }}
+              />
+            </div>
+            <span>{progress.toFixed(0)}%</span>
+          </div>
+        </td>
+        <td className="whitespace-nowrap text-sm font-medium">
+          {onEdit ? (
+            <button
+              type="button"
+              onClick={handleEdit}
+              aria-label={`Edit entry for ${goalName}`}
+              title="Edit"
+              className="btn-icon mr-3 text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
+            >
+              <Pencil size={18} />
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              aria-label={`Delete entry for ${goalName}`}
+              title="Delete"
+              className="btn-icon text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+            >
+              <Trash2 size={18} />
+            </button>
+          ) : null}
+        </td>
+      </tr>
+    );
+  }
+);
+
+EntryRow.displayName = 'EntryRow';
 
 const DailyEntryList: React.FC<DailyEntryListProps> = ({
   entries,
   goals,
   onEdit,
-  onDelete
+  onDelete,
+  deletingEntryId = null,
 }) => {
   const [sortKey, setSortKey] = useState<SortKey>('entryDate');
   const [sortAsc, setSortAsc] = useState(false);
@@ -26,202 +98,175 @@ const DailyEntryList: React.FC<DailyEntryListProps> = ({
 
   const goalNameMap = useMemo(() => {
     const map = new Map<number, string>();
-    goals.forEach((g) => map.set(g.id, g.name));
+    for (const goal of goals) map.set(goal.id, goal.name);
     return map;
   }, [goals]);
 
-  const getGoalName = (goalId: number) => goalNameMap.get(goalId) ?? 'Unknown Goal';
+  const getGoalName = useCallback(
+    (goalId: number) => goalNameMap.get(goalId) ?? 'Unknown Goal',
+    [goalNameMap]
+  );
 
   const filteredSorted = useMemo(() => {
-    let result = entries.slice();
+    let result = entries;
 
-    if (goalFilter != null) {
-      result = result.filter((e) => e.goalId === goalFilter);
-    }
-    if (dateFrom) {
-      result = result.filter((e) => e.entryDate >= dateFrom);
-    }
-    if (dateTo) {
-      result = result.filter((e) => e.entryDate <= dateTo);
-    }
+    if (goalFilter != null) result = result.filter((entry) => entry.goalId === goalFilter);
+    // `YYYY-MM-DD` strings compare chronologically, so no Date parsing needed.
+    if (dateFrom) result = result.filter((entry) => entry.entryDate >= dateFrom);
+    if (dateTo) result = result.filter((entry) => entry.entryDate <= dateTo);
 
-    result.sort((a, b) => {
-      let cmp = 0;
+    return [...result].sort((a, b) => {
+      let comparison = 0;
       switch (sortKey) {
         case 'goal':
-          cmp = getGoalName(a.goalId).localeCompare(getGoalName(b.goalId));
+          comparison = getGoalName(a.goalId).localeCompare(getGoalName(b.goalId));
           break;
         case 'entryDate':
-          cmp = a.entryDate.localeCompare(b.entryDate);
+          comparison = a.entryDate.localeCompare(b.entryDate);
           break;
         case 'actualValue':
-          cmp = a.actualValue - b.actualValue;
+          comparison = a.actualValue - b.actualValue;
           break;
         case 'targetValue':
-          cmp = a.targetValue - b.targetValue;
+          comparison = a.targetValue - b.targetValue;
           break;
         case 'progress':
-          cmp = (a.actualValue / (a.targetValue || 1)) - (b.actualValue / (b.targetValue || 1));
+          comparison =
+            a.actualValue / (a.targetValue || 1) - b.actualValue / (b.targetValue || 1);
           break;
       }
-      return sortAsc ? cmp : -cmp;
+      return sortAsc ? comparison : -comparison;
     });
+  }, [entries, goalFilter, dateFrom, dateTo, sortKey, sortAsc, getGoalName]);
 
-    return result;
-  }, [entries, goalFilter, dateFrom, dateTo, sortKey, sortAsc, goalNameMap]);
+  const toggleSort = useCallback(
+    (key: SortKey) => {
+      // Updater functions must stay pure, so branch on current state here
+      // rather than nesting a setState inside another updater.
+      if (sortKey === key) {
+        setSortAsc((previous) => !previous);
+      } else {
+        setSortKey(key);
+        setSortAsc(true);
+      }
+    },
+    [sortKey]
+  );
 
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortAsc((prev) => !prev);
-    } else {
-      setSortKey(key);
-      setSortAsc(true);
-    }
-  };
+  const hasFilters = goalFilter != null || Boolean(dateFrom) || Boolean(dateTo);
 
-  const renderSortIcon = (key: SortKey) => {
-    if (sortKey !== key) return null;
-    return sortAsc ? <ArrowUp size={14} className="inline ml-1" /> : <ArrowDown size={14} className="inline ml-1" />;
-  };
+  const clearFilters = useCallback(() => {
+    setGoalFilter(null);
+    setDateFrom('');
+    setDateTo('');
+  }, []);
+
+  const columns: Array<{ key: SortKey; label: string }> = [
+    { key: 'goal', label: 'Goal' },
+    { key: 'entryDate', label: 'Date' },
+    { key: 'actualValue', label: 'Actual' },
+    { key: 'targetValue', label: 'Target' },
+    { key: 'progress', label: 'Progress' },
+  ];
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <select
-          className="form-input !mb-0 w-auto"
+          className="form-input mb-0 w-auto"
           value={goalFilter ?? ''}
-          onChange={(e) => setGoalFilter(e.target.value ? Number(e.target.value) : null)}
+          onChange={(event) => setGoalFilter(event.target.value ? Number(event.target.value) : null)}
+          aria-label="Filter by goal"
         >
           <option value="">All Goals</option>
-          {goals.map((g) => (
-            <option key={g.id} value={g.id}>{g.name}</option>
+          {goals.map((goal) => (
+            <option key={goal.id} value={goal.id}>
+              {goal.name}
+            </option>
           ))}
         </select>
         <input
           type="date"
-          className="form-input !mb-0 w-auto"
+          className="form-input mb-0 w-auto"
           value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
+          onChange={(event) => setDateFrom(event.target.value)}
           aria-label="From date"
         />
         <input
           type="date"
-          className="form-input !mb-0 w-auto"
+          className="form-input mb-0 w-auto"
           value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
+          onChange={(event) => setDateTo(event.target.value)}
           aria-label="To date"
         />
-        {(goalFilter != null || dateFrom || dateTo) && (
-          <button
-            className="btn btn-secondary !mb-0"
-            onClick={() => { setGoalFilter(null); setDateFrom(''); setDateTo(''); }}
-          >
+        {hasFilters ? (
+          <button type="button" className="btn btn-secondary mb-0" onClick={clearFilters}>
             Clear
           </button>
-        )}
+        ) : null}
       </div>
 
       <div className="table-wrap">
-      <table className="table">
-        <thead>
-          <tr>
-            <th>
-              <button className="flex items-center font-semibold" onClick={() => toggleSort('goal')}>
-                Goal{renderSortIcon('goal')}
-              </button>
-            </th>
-            <th>
-              <button className="flex items-center font-semibold" onClick={() => toggleSort('entryDate')}>
-                Date{renderSortIcon('entryDate')}
-              </button>
-            </th>
-            <th>
-              <button className="flex items-center font-semibold" onClick={() => toggleSort('actualValue')}>
-                Actual{renderSortIcon('actualValue')}
-              </button>
-            </th>
-            <th>
-              <button className="flex items-center font-semibold" onClick={() => toggleSort('targetValue')}>
-                Target{renderSortIcon('targetValue')}
-              </button>
-            </th>
-            <th>
-              <button className="flex items-center font-semibold" onClick={() => toggleSort('progress')}>
-                Progress{renderSortIcon('progress')}
-              </button>
-            </th>
-            <th>Actions</th>
-          </tr>
-        </thead>
+        <table className="table">
+          <thead>
+            <tr>
+              {columns.map(({ key, label }) => (
+                <th key={key} scope="col" aria-sort={sortKey === key ? (sortAsc ? 'ascending' : 'descending') : 'none'}>
+                  <button
+                    type="button"
+                    className="flex items-center font-semibold"
+                    onClick={() => toggleSort(key)}
+                  >
+                    {label}
+                    {sortKey === key ? (
+                      sortAsc ? (
+                        <ArrowUp size={14} className="ml-1 inline" />
+                      ) : (
+                        <ArrowDown size={14} className="ml-1 inline" />
+                      )
+                    ) : null}
+                  </button>
+                </th>
+              ))}
+              <th scope="col">Actions</th>
+            </tr>
+          </thead>
 
-        <tbody>
-          {filteredSorted.map((entry) => {
-            const progress =
-              entry.targetValue > 0
-                ? (entry.actualValue / entry.targetValue) * 100
-                : 0;
+          <tbody>
+            {filteredSorted.map((entry) => (
+              <EntryRow
+                key={entry.id}
+                entry={entry}
+                goalName={getGoalName(entry.goalId)}
+                progress={entry.targetValue > 0 ? (entry.actualValue / entry.targetValue) * 100 : 0}
+                isDeleting={deletingEntryId === entry.id}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            ))}
+          </tbody>
+        </table>
 
-            return (
-              <tr key={entry.id}>
-                <td className="whitespace-nowrap">{getGoalName(entry.goalId)}</td>
-
-                <td className="whitespace-nowrap">{formatDate(entry.entryDate)}</td>
-
-                <td className="whitespace-nowrap">{entry.actualValue}</td>
-
-                <td className="whitespace-nowrap">{entry.targetValue}</td>
-
-                <td className="whitespace-nowrap">
-                  <div className="flex items-center">
-                    <div className="progress-track w-24 h-2.5 mr-2">
-                      <div
-                        className="bg-blue-600 h-2.5 rounded-full"
-                        style={{
-                          width: `${Math.min(progress, 100)}%`,
-                        }}
-                      />
-                    </div>
-
-                    <span>{progress.toFixed(0)}%</span>
-                  </div>
-                </td>
-
-                <td className="whitespace-nowrap text-sm font-medium">
-                  {onEdit && (
-                    <button
-                      onClick={() => onEdit(entry)}
-                      aria-label="Edit entry"
-                      title="Edit"
-                      className="text-indigo-600 hover:text-indigo-900 mr-3 dark:text-indigo-400 dark:hover:text-indigo-300"
-                    >
-                      <Pencil size={18} />
-                    </button>
-                  )}
-                  {onDelete && (
-                    <button
-                      onClick={() => onDelete(entry.id)}
-                      aria-label="Delete entry"
-                      title="Delete"
-                      className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
-      {filteredSorted.length === 0 && (
-        <div className="text-center py-8 text-[var(--text-muted)]">
-          No daily entries found.
-        </div>
-      )}
+        {filteredSorted.length === 0 ? (
+          <EmptyState
+            title={hasFilters ? 'No entries match your filters' : 'No daily entries yet'}
+            description={
+              hasFilters
+                ? 'Try clearing the filters to see all entries.'
+                : 'Add your first entry to start tracking progress.'
+            }
+            action={
+              hasFilters ? (
+                <button type="button" className="btn btn-secondary" onClick={clearFilters}>
+                  Clear filters
+                </button>
+              ) : undefined
+            }
+          />
+        ) : null}
       </div>
     </div>
   );
 };
 
-export default DailyEntryList;
+export default React.memo(DailyEntryList);

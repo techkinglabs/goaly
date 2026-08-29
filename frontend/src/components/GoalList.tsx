@@ -1,109 +1,183 @@
-import React from 'react';
-import { Goal, DailyEntry } from '../types';
+import React, { useCallback } from 'react';
+import type { Goal } from '../types';
+import EmptyState from './ui/EmptyState';
+import { PencilIcon, TrashIcon } from './ui/icons';
 
 interface GoalListProps {
   goals: Goal[];
   selectedGoalId: number | null;
+  /** `goalId -> summed actualValue`, precomputed once by `useEntries`. */
+  totalsByGoalId: Map<number, number>;
   onEdit?: (goal: Goal) => void;
   onDelete?: (id: number) => void;
   onSelect?: (goal: Goal) => void;
-  entries: DailyEntry[];
+  deletingGoalId?: number | null;
 }
 
-const calculateProgress = (goal: Goal, entries: DailyEntry[]): number => {
-  if (!goal.targetValue || goal.targetValue === 0) return 0;
-  const goalEntries = entries.filter((entry) => entry.goalId === goal.id);
-  const totalActual = goalEntries.reduce((sum, entry) => sum + (entry.actualValue ?? 0), 0);
-  return Math.min((totalActual / goal.targetValue) * 100, 100); // Cap at 100%
-};
+function progressBarClass(percentage: number): string {
+  if (percentage >= 100) return 'bg-green-500';
+  if (percentage >= 75) return 'bg-blue-500';
+  if (percentage >= 50) return 'bg-yellow-500';
+  if (percentage >= 25) return 'bg-orange-500';
+  return 'bg-red-500';
+}
 
-const GoalList: React.FC<GoalListProps> = ({ goals, selectedGoalId, onEdit, onDelete, onSelect, entries }) => {
-  const handleClick = (goal: Goal) => {
-    if (onSelect) {
-      onSelect(goal);
-    }
-  };
+interface GoalListItemProps {
+  goal: Goal;
+  progress: number;
+  isSelected: boolean;
+  isDeleting: boolean;
+  onEdit?: (goal: Goal) => void;
+  onDelete?: (id: number) => void;
+  onSelect?: (goal: Goal) => void;
+}
 
-  const handleEdit = (e: React.MouseEvent, goal: Goal) => {
-    e.stopPropagation();
-    if (onEdit) onEdit(goal);
-  };
+/**
+ * Memoized row: re-renders only when this goal's own data, progress or
+ * selection changes — not when a sibling row updates.
+ */
+const GoalListItem = React.memo<GoalListItemProps>(
+  ({ goal, progress, isSelected, isDeleting, onEdit, onDelete, onSelect }) => {
+    const handleSelect = useCallback(() => onSelect?.(goal), [onSelect, goal]);
 
-  const handleDelete = (e: React.MouseEvent, id: number) => {
-    e.stopPropagation();
-    if (onDelete) onDelete(id);
-  };
+    const handleEdit = useCallback(
+      (event: React.MouseEvent) => {
+        event.stopPropagation();
+        onEdit?.(goal);
+      },
+      [onEdit, goal]
+    );
 
-  // Get progress bar class based on percentage
-  const getProgressBarClass = (percentage: number) => {
-    if (percentage >= 100) return 'bg-green-500';
-    if (percentage >= 75) return 'bg-blue-500';
-    if (percentage >= 50) return 'bg-yellow-500';
-    if (percentage >= 25) return 'bg-orange-500';
-    return 'bg-red-500';
-  };
+    const handleDelete = useCallback(
+      (event: React.MouseEvent) => {
+        event.stopPropagation();
+        onDelete?.(goal.id);
+      },
+      [onDelete, goal.id]
+    );
+
+    const handleKeyDown = useCallback(
+      (event: React.KeyboardEvent) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect?.(goal);
+        }
+      },
+      [onSelect, goal]
+    );
+
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        aria-pressed={isSelected}
+        onClick={handleSelect}
+        onKeyDown={handleKeyDown}
+        className={`card goal-card mb-0 cursor-pointer p-3 transition-all ${
+          isSelected ? 'selected' : 'hover:shadow-md'
+        } ${isDeleting ? 'pointer-events-none opacity-50' : ''}`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-md truncate font-medium text-[var(--text-primary)]">{goal.name}</h3>
+          <div className="flex items-center gap-1">
+            {onEdit ? (
+              <button
+                type="button"
+                onClick={handleEdit}
+                className="btn-icon text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                title="Edit"
+                aria-label={`Edit goal ${goal.name}`}
+              >
+                <PencilIcon />
+              </button>
+            ) : null}
+            {onDelete ? (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="btn-icon text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                title="Delete"
+                aria-label={`Delete goal ${goal.name}`}
+              >
+                <TrashIcon />
+              </button>
+            ) : null}
+            <span className={`badge ${goal.isActive ? 'badge-success' : 'badge-danger'}`}>
+              {goal.isActive ? 'Active' : 'Inactive'}
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-2">
+          <div
+            className="progress-track h-2 w-full"
+            role="progressbar"
+            aria-valuenow={Math.round(progress)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`${goal.name} progress`}
+          >
+            <div
+              className={`h-2 rounded-full ${progressBarClass(progress)}`}
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <div className="mt-1 flex justify-between text-xs text-[var(--text-muted)]">
+            <span>{progress.toFixed(0)}%</span>
+            <span>
+              {goal.targetValue} {goal.unit}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+);
+
+GoalListItem.displayName = 'GoalListItem';
+
+const GoalList: React.FC<GoalListProps> = ({
+  goals,
+  selectedGoalId,
+  totalsByGoalId,
+  onEdit,
+  onDelete,
+  onSelect,
+  deletingGoalId = null,
+}) => {
+  if (goals.length === 0) {
+    return (
+      <EmptyState
+        title="No goals yet"
+        description="Create your first goal to start tracking progress."
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
       {goals.map((goal) => {
-        const progress = calculateProgress(goal, entries);
-        const isGoalSelected = goal.id === selectedGoalId;
+        // Progress is a cheap lookup + divide; no per-row filter/reduce.
+        const total = totalsByGoalId.get(goal.id) ?? 0;
+        const progress =
+          goal.targetValue > 0 ? Math.min((total / goal.targetValue) * 100, 100) : 0;
+
         return (
-          <div
+          <GoalListItem
             key={goal.id}
-            className={`card goal-card !p-3 !mb-0 cursor-pointer transition-all ${isGoalSelected ? 'selected' : 'hover:shadow-md'}`}
-            onClick={() => handleClick(goal)}
-          >
-            <div className="flex justify-between items-start gap-2">
-              <h3 className="text-md font-medium text-[var(--text-primary)] truncate">{goal.name}</h3>
-              <div className="flex items-center gap-1">
-                {onEdit && (
-                  <button
-                    onClick={(e) => handleEdit(e, goal)}
-                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1"
-                    title="Edit"
-                    aria-label="Edit goal"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                )}
-                {onDelete && (
-                  <button
-                    onClick={(e) => handleDelete(e, goal.id)}
-                    className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 p-1"
-                    title="Delete"
-                    aria-label="Delete goal"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                )}
-                <span className={`badge ${goal.isActive ? 'badge-success' : 'badge-danger'}`}>
-                  {goal.isActive ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-            </div>
-            
-            <div className="mt-2">
-              <div className="progress-track w-full h-2">
-                <div 
-                  className={`h-2 rounded-full ${getProgressBarClass(progress)}`} 
-                  style={{ width: `${progress}%` }}
-                ></div>
-              </div>
-              <div className="flex justify-between text-xs text-[var(--text-muted)] mt-1">
-                <span>{progress.toFixed(0)}%</span>
-                <span>{goal.targetValue} {goal.unit}</span>
-              </div>
-            </div>
-          </div>
+            goal={goal}
+            progress={progress}
+            isSelected={goal.id === selectedGoalId}
+            isDeleting={deletingGoalId === goal.id}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onSelect={onSelect}
+          />
         );
       })}
     </div>
   );
 };
 
-export default GoalList;
+export default React.memo(GoalList);

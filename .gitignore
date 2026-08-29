@@ -30,3 +30,19 @@ backend/target/
 # Logs
 *.log
 *.class
+
+# Kilo Code
+.kilo/
+# build artifacts
+temp_build/
+node_modules/
+# AI working files - do not commit
+COMMITS.md
+DECISIONS.md
+all-tsx*.txt
+all-java.txt
+**/all-java.txt
+nazov.todo.md
+otazky-od-meta.md
+readme2.md
+todo-od-meta*.md

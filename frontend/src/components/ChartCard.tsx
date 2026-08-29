@@ -1,25 +1,15 @@
-import React, { useState, useEffect } from 'react';
-
-const FullscreenIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-  </svg>
-);
+import React, { useCallback, useState } from 'react';
+import { useEscapeKey } from '../hooks/useEscapeKey';
+import { CloseIcon, FullscreenIcon } from './ui/icons';
 
 interface ChartCardProps {
   title: string;
   children: React.ReactNode;
-  /** Height of the chart body when in fullscreen. */
+  /** Height of the chart body when fullscreen. */
   fullscreenHeight?: string;
   className?: string;
   bodyClassName?: string;
-  /** Hide the title heading (chart still accessible). */
+  /** Hide the visible heading (the chart stays labelled for a11y). */
   hideTitle?: boolean;
 }
 
@@ -33,49 +23,47 @@ const ChartCard: React.FC<ChartCardProps> = ({
 }) => {
   const [fullscreen, setFullscreen] = useState(false);
 
-  useEffect(() => {
-    if (!fullscreen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setFullscreen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [fullscreen]);
+  const exitFullscreen = useCallback(() => setFullscreen(false), []);
+  useEscapeKey(fullscreen, exitFullscreen);
 
   const panel = (
-    <div className={`surface !mb-0 rounded-xl p-6 flex flex-col ${className}`} style={fullscreen ? { height: fullscreenHeight } : undefined}>
-      <div className="flex justify-between items-center mb-4">
+    <section
+      aria-label={title}
+      className={`surface mb-0 flex flex-col rounded-xl p-6 ${className}`}
+      style={fullscreen ? { height: fullscreenHeight } : undefined}
+    >
+      <div className="mb-4 flex items-center justify-between gap-3">
         {hideTitle ? (
           <span />
         ) : (
           <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
         )}
         <button
-          onClick={() => setFullscreen((v) => !v)}
-          className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+          type="button"
+          onClick={() => setFullscreen((previous) => !previous)}
+          className="text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
           aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-          title={fullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen (Esc)'}
+          title={fullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}
         >
           {fullscreen ? <CloseIcon /> : <FullscreenIcon />}
         </button>
       </div>
-      <div className={fullscreen ? 'flex-1 min-h-0' : `min-h-0 ${bodyClassName}`} style={fullscreen ? undefined : { height: 300 }}>
+
+      <div
+        className={fullscreen ? 'min-h-0 flex-1' : `h-[300px] min-h-0 ${bodyClassName}`}
+      >
         {children}
       </div>
-    </div>
+    </section>
   );
 
-  if (fullscreen) {
-    return (
-      <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm p-4 flex flex-col">
-        <div className="flex-1" style={{ minHeight: 0 }}>
-          {panel}
-        </div>
-      </div>
-    );
-  }
+  if (!fullscreen) return panel;
 
-  return panel;
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/70 p-4 backdrop-blur-sm">
+      <div className="min-h-0 flex-1">{panel}</div>
+    </div>
+  );
 };
 
-export default ChartCard;
+export default React.memo(ChartCard);

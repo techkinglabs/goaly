@@ -43,6 +43,7 @@ public class GoalService {
         return goalRepository.findById(id);
     }
 
+    @Transactional
     public Goal createGoal(Goal goal) {
         Goal saved = goalRepository.save(goal);
 
@@ -61,7 +62,7 @@ public class GoalService {
         return goalRepository.save(saved);
     }
 
-    public Goal updateGoalInDb(Goal goal) {
+    public Goal updateGoal(Goal goal) {
         return goalRepository.save(goal);
     }
 
@@ -76,15 +77,17 @@ public class GoalService {
 
         goalRepository.delete(goal);
     }
-
+    //Calculate period to week
     BigDecimal toWeekly(BigDecimal value, String period) {
         if (period == null) return value;
+        BigDecimal week = BigDecimal.valueOf(7);
+        BigDecimal valuePerWeek = value.multiply(week);
         return switch (period) {
-            case "DAY" -> value.multiply(BigDecimal.valueOf(7));
-            case "MONTH" -> value.divide(BigDecimal.valueOf(30.4375), 4, java.math.RoundingMode.HALF_UP);
-            case "YEAR" -> value.divide(BigDecimal.valueOf(365.25), 4, java.math.RoundingMode.HALF_UP);
-            case "WORKWEEK" -> value.divide(BigDecimal.valueOf(5), 4, java.math.RoundingMode.HALF_UP);
-            case "WEEKEND" -> value.divide(BigDecimal.valueOf(2), 4, java.math.RoundingMode.HALF_UP);
+            case "DAY" -> valuePerWeek;
+            case "MONTH" ->  valuePerWeek.multiply(BigDecimal.valueOf(30.4375));
+            case "YEAR" -> valuePerWeek.multiply(BigDecimal.valueOf(365.25));
+            case "WORKWEEK" -> valuePerWeek.multiply(BigDecimal.valueOf(7)).divide(BigDecimal.valueOf(5),4, java.math.RoundingMode.HALF_UP);
+            case "WEEKEND" -> valuePerWeek.multiply(BigDecimal.valueOf(7)).divide(BigDecimal.valueOf(2),4, java.math.RoundingMode.HALF_UP);
             default -> value;
         };
     }
@@ -124,7 +127,7 @@ public class GoalService {
 
         targetHistoryRepository.findFirstByGoalIdAndValidFromLessThanOrderByValidFromDesc(goalId, validFrom)
                 .ifPresent(prev -> {
-                    prev.setValidTo(validFrom);
+                    prev.setValidTo(validFrom.minusDays(1));
                     targetHistoryRepository.save(prev);
                 });
 
@@ -168,7 +171,8 @@ public class GoalService {
         List<TargetHistory> entries = targetHistoryRepository.findByGoalIdOrderByValidFromAsc(goalId);
         for (int i = 0; i < entries.size(); i++) {
             LocalDate nextFrom = (i + 1 < entries.size()) ? entries.get(i + 1).getValidFrom() : null;
-            entries.get(i).setValidTo(nextFrom);
+            assert nextFrom != null;
+            entries.get(i).setValidTo(nextFrom.minusDays(1));
         }
         targetHistoryRepository.saveAll(entries);
     }

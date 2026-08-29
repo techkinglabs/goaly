@@ -1,54 +1,82 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { formatDate } from '../api';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  addMonths,
+  daysInMonth as getDaysInMonth,
+  formatDate,
+  mondayBasedDay,
+  parseLocalDate,
+  startOfMonth,
+  toLocalISODate,
+} from '../utils/date';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface DatePickerProps {
   value: string;
   onChange: (value: string) => void;
   className?: string;
-  required?: boolean;
+  id?: string;
   min?: string;
   autoFocus?: boolean;
+  invalid?: boolean;
+  disabled?: boolean;
+  placeholder?: string;
 }
 
-const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'] as const;
+/** Approx. calendar popover height; used to decide flip direction. */
+const POPOVER_HEIGHT = 320;
 
-const toISO = (d: Date): string => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
-
-const startOfMonth = (d: Date): Date => new Date(d.getFullYear(), d.getMonth(), 1);
-const addMonths = (d: Date, n: number): Date => new Date(d.getFullYear(), d.getMonth() + n, 1);
-
+/**
+ * Accessible date picker built on the shared local-date helpers.
+ * All parsing goes through `parseLocalDate`, so a `YYYY-MM-DD` value is never
+ * interpreted as UTC midnight (which shifted the day in western timezones).
+ */
 const DatePicker: React.FC<DatePickerProps> = ({
   value,
   onChange,
   className = '',
-  required,
+  id,
   min,
   autoFocus,
+  invalid = false,
+  disabled = false,
+  placeholder = 'Select date',
 }) => {
   const [open, setOpen] = useState(false);
   const [openUp, setOpenUp] = useState(false);
-  const [view, setView] = useState<Date>(value ? new Date(value) : new Date());
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const toggleOpen = () => {
+  const selected = useMemo(() => {
+    if (!value) return null;
+    const parsed = parseLocalDate(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }, [value]);
+
+  const [view, setView] = useState<Date>(() => selected ?? new Date());
+
+  // Keep the visible month in sync with an externally changed value.
+  useEffect(() => {
+    if (selected) setView(startOfMonth(selected));
+  }, [selected]);
+
+  const close = useCallback(() => setOpen(false), []);
+  useEscapeKey(open, close);
+
+  const toggleOpen = useCallback(() => {
+    if (disabled) return;
+    // Measure before flipping: state updaters must remain side-effect free.
     if (!open && containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      // Open upward if there's not enough room below for the ~300px calendar
-      setOpenUp(spaceBelow < 320);
+      setOpenUp(window.innerHeight - rect.bottom < POPOVER_HEIGHT);
     }
-    setOpen((o) => !o);
-  };
+    setOpen((previous) => !previous);
+  }, [disabled, open]);
 
+  // Click-outside to dismiss.
   useEffect(() => {
     if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+    const handler = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setOpen(false);
       }
     };
@@ -56,41 +84,52 @@ const DatePicker: React.FC<DatePickerProps> = ({
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  useEffect(() => {
-    if (value) setView(new Date(value));
-  }, [value]);
+  const cells = useMemo<(Date | null)[]>(() => {
+    const first = startOfMonth(view);
+    const leadBlanks = mondayBasedDay(first);
+    const total = getDaysInMonth(view);
+    const result: (Date | null)[] = Array.from({ length: leadBlanks }, () => null);
+    for (let day = 1; day <= total; day += 1) {
+      result.push(new Date(view.getFullYear(), view.getMonth(), day));
+    }
+    return result;
+  }, [view]);
 
-  const selected = value ? new Date(value) : null;
-  const first = startOfMonth(view);
-  // Monday-based offset: JS getDay() Sunday=0 -> shift so Monday=0
-  const leadBlanks = (first.getDay() + 6) % 7;
-  const daysInMonth = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
+  const isDisabled = useCallback((date: Date) => Boolean(min) && toLocalISODate(date) < min!, [min]);
 
-  const cells: (Date | null)[] = [];
-  for (let i = 0; i < leadBlanks; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(view.getFullYear(), view.getMonth(), d));
-
-  const isDisabled = (d: Date): boolean => {
-    if (min && toISO(d) < min) return true;
-    return false;
-  };
+  const selectedIso = selected ? toLocalISODate(selected) : null;
+  const todayIso = toLocalISODate(new Date());
 
   return (
     <div className={`relative ${className}`} ref={containerRef}>
       <button
         type="button"
+        id={id}
         className="form-input w-full text-left"
-        onClick={() => toggleOpen()}
+        onClick={toggleOpen}
+        disabled={disabled}
+        autoFocus={autoFocus}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-invalid={invalid}
       >
-        {selected ? formatDate(selected) : 'Select date'}
+        {selected ? formatDate(selected) : placeholder}
       </button>
-      {open && (
-        <div className={`absolute z-50 ${openUp ? 'bottom-full mb-1' : 'mt-1'} p-3 surface rounded-xl border border-[var(--border)] shadow-lg`} style={{ backgroundColor: 'var(--bg-elevated)' }}>
-          <div className="flex items-center justify-between mb-2">
+
+      {open ? (
+        <div
+          role="dialog"
+          aria-label="Choose date"
+          className={`absolute z-50 rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] p-3 shadow-lg ${
+            openUp ? 'bottom-full mb-1' : 'mt-1'
+          }`}
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
             <button
               type="button"
-              className="btn btn-secondary !px-2 !py-1"
-              onClick={() => setView((v) => addMonths(v, -1))}
+              className="btn btn-secondary px-2 py-1"
+              onClick={() => setView((current) => addMonths(current, -1))}
+              aria-label="Previous month"
             >
               ‹
             </button>
@@ -99,49 +138,57 @@ const DatePicker: React.FC<DatePickerProps> = ({
             </span>
             <button
               type="button"
-              className="btn btn-secondary !px-2 !py-1"
-              onClick={() => setView((v) => addMonths(v, 1))}
+              className="btn btn-secondary px-2 py-1"
+              onClick={() => setView((current) => addMonths(current, 1))}
+              aria-label="Next month"
             >
               ›
             </button>
           </div>
-          <div className="grid grid-cols-7 gap-1 text-center text-xs text-[var(--text-muted)] mb-1">
-            {WEEKDAYS.map((w) => (
-              <div key={w}>{w}</div>
+
+          <div className="mb-1 grid grid-cols-7 gap-1 text-center text-xs text-[var(--text-muted)]">
+            {WEEKDAYS.map((weekday) => (
+              <div key={weekday}>{weekday}</div>
             ))}
           </div>
+
           <div className="grid grid-cols-7 gap-1">
-            {cells.map((d, i) => {
-              if (!d) return <div key={`b${i}`} />;
-              const iso = toISO(d);
-              const isSelected = selected && toISO(selected) === iso;
-              const disabled = isDisabled(d);
+            {cells.map((date, index) => {
+              if (!date) return <div key={`blank-${index}`} />;
+              const iso = toLocalISODate(date);
+              const isSelected = selectedIso === iso;
+              const cellDisabled = isDisabled(date);
+
               return (
                 <button
                   key={iso}
                   type="button"
-                  disabled={disabled}
+                  disabled={cellDisabled}
+                  aria-current={iso === todayIso ? 'date' : undefined}
+                  aria-pressed={isSelected}
                   onClick={() => {
                     onChange(iso);
                     setOpen(false);
                   }}
-                  className={`!px-2 !py-1 rounded text-sm ${
+                  className={`rounded px-2 py-1 text-sm ${
                     isSelected
                       ? 'bg-blue-600 text-white'
-                      : disabled
-                        ? 'opacity-40 cursor-not-allowed text-[var(--text-muted)]'
-                        : 'hover:bg-blue-500/20 text-[var(--text-primary)]'
+                      : cellDisabled
+                        ? 'cursor-not-allowed text-[var(--text-muted)] opacity-40'
+                        : iso === todayIso
+                          ? 'text-[var(--text-primary)] ring-1 ring-[var(--accent)] hover:bg-blue-500/20'
+                          : 'text-[var(--text-primary)] hover:bg-blue-500/20'
                   }`}
                 >
-                  {d.getDate()}
+                  {date.getDate()}
                 </button>
               );
             })}
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };
 
-export default DatePicker;
+export default React.memo(DatePicker);

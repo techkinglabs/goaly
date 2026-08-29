@@ -1,9 +1,7 @@
 package org.techkinglabs.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -13,7 +11,8 @@ import java.time.LocalDate;
         name = "uk_target_history_goal_date",
         columnNames = {"goal_id", "valid_from"}
 ))
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class TargetHistory {

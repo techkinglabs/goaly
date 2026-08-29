@@ -106,7 +106,7 @@ public class ChartDataService {
             case "week":
                 return startOfWeek(anchor);
             case "year":
-                return LocalDate.now().withDayOfYear(1);
+                return anchor.withDayOfYear(1);
             case "all":
             default:
                 return null;
@@ -138,6 +138,6 @@ public class ChartDataService {
         if (entry.getTargetValue().compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ZERO;
         }
-        return (entry.getActualValue().divide(entry.getTargetValue(), 4, java.math.RoundingMode.HALF_UP)).multiply(BigDecimal.valueOf(100l)) ;
+        return (entry.getActualValue().divide(entry.getTargetValue(), 4, java.math.RoundingMode.HALF_UP)).multiply(BigDecimal.valueOf(100)) ;
     }
 }

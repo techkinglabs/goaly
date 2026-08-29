@@ -7,10 +7,8 @@ import org.techkinglabs.dto.TargetHistoryResponse;
 import org.techkinglabs.entity.Goal;
 import org.techkinglabs.entity.TargetHistory;
 import org.techkinglabs.exception.ResourceNotFoundException;
-import org.techkinglabs.mapper.DailyEntryMapper;
 import org.techkinglabs.mapper.GoalMapper;
 import org.techkinglabs.service.GoalService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.techkinglabs.service.TargetHistoryService;
@@ -57,7 +55,7 @@ public class GoalController {
     public ResponseEntity<GoalResponse> updateGoal(@PathVariable Long id, @RequestBody @Valid GoalRequest goalRequest) {
         Goal goal = goalService.getGoalById(id).orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
         GoalMapper.updateEntityFromRequest(goalRequest, goal);
-        Goal updatedGoal = goalService.updateGoalInDb(goal);
+        Goal updatedGoal = goalService.updateGoal(goal);
         return ResponseEntity.ok(GoalMapper.toResponse(updatedGoal, goalService.getTargetHistory(updatedGoal.getId())));
     }
 
