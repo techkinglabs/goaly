@@ -76,14 +76,6 @@ class GoalServiceTest {
     }
 
     @Test
-    void testToWeeklyMatchesFrontendConstants() {
-        assertEquals(0, new BigDecimal("1.0000").compareTo(goalService.toWeekly(new BigDecimal("30.4375"), "MONTH")));
-        assertEquals(0, new BigDecimal("1.0000").compareTo(goalService.toWeekly(new BigDecimal("365.25"), "YEAR")));
-        assertEquals(0, new BigDecimal("7").compareTo(goalService.toWeekly(new BigDecimal("1"), "DAY")));
-        assertEquals(0, new BigDecimal("5").compareTo(goalService.toWeekly(new BigDecimal("5"), "WEEK")));
-    }
-
-    @Test
     void testAddTargetHistoryRejectsValidToBeforeValidFrom() {
         Long goalId = 1L;
         Goal goal = new Goal();

@@ -85,19 +85,23 @@ class ChartDataServiceTest {
 
         List<Map<String, Object>> series = chartDataService.getChartDataForAllGoals("7d", anchor);
 
-        assertEquals(2, series.size());
+        // Every day in the window is pre-filled (anchor-6 .. anchor = 7 days),
+        // so the cumulative line is continuous even when some days have no entry.
+        assertEquals(7, series.size());
     }
 
     @Test
     void testCumulativePercentNotClippedAbove100() {
         when(dailyEntryService.getEntriesByGoalId(1L)).thenReturn(List.of(
-                entry(1L, 1L, LocalDate.of(2026, 3, 1), 6, 10),
-                entry(2L, 1L, LocalDate.of(2026, 3, 2), 6, 10)
+                entry(1L, 1L, LocalDate.of(2026, 3, 2), 6, 10), // Monday
+                entry(2L, 1L, LocalDate.of(2026, 3, 3), 6, 10)  // Tuesday, same week
         ));
         when(goalRepository.findAll()).thenReturn(List.of(goal(1L, 10)));
         when(goalService.getEffectiveTarget(anyLong(), any())).thenReturn(new BigDecimal("10"));
 
-        List<Map<String, Object>> series = chartDataService.getChartDataForGoal(1L, "all", LocalDate.of(2026, 3, 2));
+        // Both entries fall in one week, so the cumulative denominator is a single
+        // weekly target (10); 12 done vs 10 target = 120% (not clipped at 100%).
+        List<Map<String, Object>> series = chartDataService.getChartDataForGoal(1L, "all", LocalDate.of(2026, 3, 3));
 
         Object last = series.get(series.size() - 1).get("total_1");
         assertTrue(last instanceof Number);

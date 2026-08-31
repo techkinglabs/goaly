@@ -3,6 +3,7 @@ import { useCallback, useMemo } from 'react';
 import { queryKeys } from '../lib/queryClient';
 import { entriesService } from '../services/entriesService';
 import type { DailyEntry, DailyEntryPayload } from '../types';
+import { weeklyTotal } from '../utils/goalMath';
 
 /** Single source of truth for daily-entry data. */
 export function useEntries() {
@@ -61,9 +62,23 @@ export function useEntries() {
     return grouped;
   }, [entries]);
 
+  /**
+   * `goalId -> total actual value for the current week`, so the goal-list
+   * progress matches the Goal Details "this week" figure and resets to 0 on a
+   * new week. Computed once per entries change from the per-goal buckets.
+   */
+  const weekTotalsByGoalId = useMemo(() => {
+    const totals = new Map<number, number>();
+    for (const [goalId, goalEntries] of entriesByGoalId) {
+      totals.set(goalId, weeklyTotal(goalEntries));
+    }
+    return totals;
+  }, [entriesByGoalId]);
+
   return {
     entries,
     totalsByGoalId,
+    weekTotalsByGoalId,
     entriesByGoalId,
 
     isLoading: query.isLoading,

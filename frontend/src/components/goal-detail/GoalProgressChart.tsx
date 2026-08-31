@@ -38,13 +38,13 @@ const GoalProgressChart: React.FC<GoalProgressChartProps> = ({
   );
 
   const maxTotalRaw = useMemo(
-    () => chartData.reduce((max, point) => Math.max(max, point.totalRaw), 0),
+    () => chartData.reduce((max, point) => Math.max(max, point.cumulativeProgressRaw), 0),
     [chartData]
   );
 
   const percentDomainMax = useMemo(() => {
     const max = chartData.reduce(
-      (currentMax, point) => Math.max(currentMax, point.totalProgress, point.progress),
+      (currentMax, point) => Math.max(currentMax, point.cumulativeProgress, point.dailyProgress),
       0
     );
     return Math.max(100, Math.ceil(max / 25) * 25);
@@ -117,19 +117,6 @@ const GoalProgressChart: React.FC<GoalProgressChartProps> = ({
                 tickFormatter={(value) => `${value} ${goal.unit}`}
               />
 
-              {/* Invisible series that anchors the right-hand raw axis. */}
-              <Line
-                yAxisId="raw"
-                type="monotone"
-                dataKey="totalRaw"
-                stroke="transparent"
-                strokeWidth={0}
-                dot={false}
-                activeDot={false}
-                legendType="none"
-                name=" "
-                isAnimationActive={false}
-              />
               <ReferenceLine
                 yAxisId="percent"
                 y={100}
@@ -151,29 +138,70 @@ const GoalProgressChart: React.FC<GoalProgressChartProps> = ({
                 formatter={(value, name, item) => {
                   if (name === ' ') return [null as unknown as string, null as unknown as string];
                   const payload = (item?.payload ?? {}) as Record<string, number>;
-                  const raw = name === 'Total Progress' ? payload.totalRaw : payload.progressRaw;
+                  const raw = name === 'Cumulative progress' ? payload.cumulativeProgressRaw : payload.dailyProgressRaw;
                   return [`${value}% (${raw} ${goal.unit})`, name];
                 }}
               />
-              <Legend />
-              <Line
-                yAxisId="percent"
-                type="monotone"
-                dataKey="progress"
-                stroke="#3b82f6"
-                strokeWidth={2}
-                dot={{ r: 4 }}
-                name="Progress"
+              <Legend
+                content={({ payload }) => {
+                  if (!payload || payload.length === 0) return null;
+                  // Force a stable legend order: Daily progress first, then Cumulative progress.
+                  const order = ['Daily progress', 'Cumulative progress'];
+                  const sorted = [...payload].sort((a, b) => {
+                    const av = a.value ?? '';
+                    const bv = b.value ?? '';
+                    return order.indexOf(av) - order.indexOf(bv);
+                  });
+                  return (
+                    <ul className="flex flex-wrap items-center justify-center gap-4 pt-2">
+                      {sorted.map((entry, index) => (
+                        <li
+                          key={`${entry.value}-${index}`}
+                          className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)]"
+                        >
+                          <span
+                            className="inline-block h-2.5 w-4 rounded-sm"
+                            style={{ backgroundColor: entry.color }}
+                          />
+                          {entry.value}
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                }}
               />
               <Line
                 yAxisId="percent"
                 type="monotone"
-                dataKey="totalProgress"
+                dataKey="dailyProgress"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                dot={{ r: 4 }}
+                name="Daily progress"
+              />
+              <Line
+                yAxisId="percent"
+                type="monotone"
+                dataKey="cumulativeProgress"
                 stroke="#ef4444"
                 strokeWidth={2}
                 strokeDasharray="5 5"
                 dot={{ r: 4 }}
-                name="Total Progress"
+                name="Cumulative progress"
+              />
+              {/* Invisible series that anchors the right-hand raw axis. Declared last
+                  and excluded from the legend so it never affects legend order. */}
+              <Line
+                yAxisId="raw"
+                type="monotone"
+                dataKey="cumulativeProgressRaw"
+                stroke="transparent"
+                strokeWidth={0}
+                dot={false}
+                activeDot={false}
+                legendType="none"
+                name=" "
+                isAnimationActive={false}
               />
             </LineChart>
           </ResponsiveContainer>

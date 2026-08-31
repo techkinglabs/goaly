@@ -1,13 +1,16 @@
 import React, { useCallback } from 'react';
 import type { Goal } from '../types';
+import { periodLabel } from '../utils/goalMath';
 import EmptyState from './ui/EmptyState';
 import { PencilIcon, TrashIcon } from './ui/icons';
 
 interface GoalListProps {
   goals: Goal[];
   selectedGoalId: number | null;
-  /** `goalId -> summed actualValue`, precomputed once by `useEntries`. */
+  /** `goalId -> summed actualValue (all time)`, precomputed by `useEntries`. */
   totalsByGoalId: Map<number, number>;
+  /** `goalId -> summed actualValue for the current week`, precomputed by `useEntries`. */
+  weekTotalsByGoalId: Map<number, number>;
   onEdit?: (goal: Goal) => void;
   onDelete?: (id: number) => void;
   onSelect?: (goal: Goal) => void;
@@ -120,13 +123,14 @@ const GoalListItem = React.memo<GoalListItemProps>(
           >
             <div
               className={`h-2 rounded-full ${progressBarClass(progress)}`}
-              style={{ width: `${progress}%` }}
+              style={{ width: `${Math.min(progress, 100)}%` }}
             />
           </div>
           <div className="mt-1 flex justify-between text-xs text-[var(--text-muted)]">
             <span>{progress.toFixed(0)}%</span>
             <span>
               {goal.targetValue} {goal.unit}
+              {goal.period ? ` (${periodLabel(goal.period)})` : ''}
             </span>
           </div>
         </div>
@@ -141,6 +145,7 @@ const GoalList: React.FC<GoalListProps> = ({
   goals,
   selectedGoalId,
   totalsByGoalId,
+  weekTotalsByGoalId,
   onEdit,
   onDelete,
   onSelect,
@@ -158,10 +163,10 @@ const GoalList: React.FC<GoalListProps> = ({
   return (
     <div className="space-y-4">
       {goals.map((goal) => {
-        // Progress is a cheap lookup + divide; no per-row filter/reduce.
-        const total = totalsByGoalId.get(goal.id) ?? 0;
-        const progress =
-          goal.targetValue > 0 ? Math.min((total / goal.targetValue) * 100, 100) : 0;
+        // Progress is the current week's actual vs. target; it is intentionally
+        // NOT clamped to 100% and resets to 0 at the start of a new week.
+        const total = weekTotalsByGoalId.get(goal.id) ?? 0;
+        const progress = goal.targetValue > 0 ? (total / goal.targetValue) * 100 : 0;
 
         return (
           <GoalListItem

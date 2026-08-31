@@ -77,20 +77,6 @@ public class GoalService {
 
         goalRepository.delete(goal);
     }
-    //Calculate period to week
-    BigDecimal toWeekly(BigDecimal value, String period) {
-        if (period == null) return value;
-        BigDecimal week = BigDecimal.valueOf(7);
-        BigDecimal valuePerWeek = value.multiply(week);
-        return switch (period) {
-            case "DAY" -> valuePerWeek;
-            case "MONTH" ->  valuePerWeek.multiply(BigDecimal.valueOf(30.4375));
-            case "YEAR" -> valuePerWeek.multiply(BigDecimal.valueOf(365.25));
-            case "WORKWEEK" -> valuePerWeek.multiply(BigDecimal.valueOf(7)).divide(BigDecimal.valueOf(5),4, java.math.RoundingMode.HALF_UP);
-            case "WEEKEND" -> valuePerWeek.multiply(BigDecimal.valueOf(7)).divide(BigDecimal.valueOf(2),4, java.math.RoundingMode.HALF_UP);
-            default -> value;
-        };
-    }
 
     public List<TargetHistory> getTargetHistory(Long goalId) {
         return targetHistoryRepository.findByGoalIdOrderByValidFromAsc(goalId);
@@ -134,7 +120,7 @@ public class GoalService {
         if (validFrom != null && !validFrom.isAfter(LocalDate.now())) {
             goal.setAmountPerPeriod(value);
             goal.setPeriod(normalizedPeriod);
-            goal.setTargetValue(toWeekly(value, normalizedPeriod));
+            goal.setTargetValue(value);
             goalRepository.save(goal);
         }
 

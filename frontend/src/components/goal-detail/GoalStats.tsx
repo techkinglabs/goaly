@@ -3,9 +3,9 @@ import type { DailyEntry, Goal } from '../../types';
 import {
   computeWeeklyChange,
   derivePeriodTargets,
-  progressPercent,
-  sumActual,
+  dailyProgressPercent,
 } from '../../utils/goalMath';
+import { startOfWeek, today, parseLocalDate } from '../../utils/date';
 
 interface GoalStatsProps {
   goal: Goal;
@@ -14,11 +14,22 @@ interface GoalStatsProps {
 
 /** Header + summary tiles for a goal. */
 const GoalStats: React.FC<GoalStatsProps> = ({ goal, entries }) => {
-  const totalActual = useMemo(() => sumActual(entries), [entries]);
+  const totalActual = useMemo(() => {
+    const weekStart = startOfWeek(today());
+    const endOfToday = new Date(today());
+    endOfToday.setHours(23, 59, 59, 999);
+    return entries.reduce(
+      (sum, entry) => {
+        const date = parseLocalDate(entry.entryDate);
+        return date >= weekStart && date <= endOfToday ? sum + entry.actualValue : sum;
+      },
+      0
+    );
+  }, [entries]);
   const weeklyChange = useMemo(() => computeWeeklyChange(entries), [entries]);
   const derived = useMemo(() => derivePeriodTargets(goal), [goal]);
 
-  const percentage = progressPercent(totalActual, goal.targetValue);
+  const percentage = dailyProgressPercent(totalActual, goal.targetValue);
   const targetHit = goal.targetValue > 0 && totalActual >= goal.targetValue;
 
   return (

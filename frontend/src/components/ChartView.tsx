@@ -107,8 +107,8 @@ const ChartView: React.FC<ChartViewProps> = ({ rows, isDarkMode, goals = [] }) =
     if (firstGoalId == null) return [];
     return rows.map((row) => ({
       name: row.label,
-      progress: row[`goal_${firstGoalId}`] ?? 0,
-      totalProgress: row[`total_${firstGoalId}`] ?? 0,
+      dailyProgress: row[`goal_${firstGoalId}`] ?? 0,
+      cumulativeProgress: row[`total_${firstGoalId}`] ?? 0,
     }));
   }, [rows, firstGoalId]);
 
@@ -198,8 +198,8 @@ const ChartView: React.FC<ChartViewProps> = ({ rows, isDarkMode, goals = [] }) =
                 <YAxis className={axisClassName} />
                 <Tooltip {...tooltipStyles} />
                 <Legend />
-                <Bar dataKey="progress" fill="#10b981" name="Progress (%)" />
-                <Bar dataKey="totalProgress" fill="#f59e0b" name="Total Progress (%)" />
+                <Bar dataKey="progress" fill="#10b981" name="Daily Progress (%)" />
+                <Bar dataKey="totalProgress" fill="#f59e0b" name="Cumulative Progress (%)" />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>

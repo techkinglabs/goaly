@@ -39,26 +39,36 @@ public class ChartDataService {
         LocalDate to = anchorDate;
 
         Map<Long, BigDecimal> goalTargets = new HashMap<>();
-        goalRepository.findAll().forEach(g -> goalTargets.put(g.getId(), g.getTargetValue()));
+        Map<Long, String> goalPeriods = new HashMap<>();
+        goalRepository.findAll().forEach(g -> {
+            goalTargets.put(g.getId(), g.getTargetValue());
+            goalPeriods.put(g.getId(), g.getPeriod());
+        });
 
         boolean weekly = "week".equalsIgnoreCase(range);
 
         Map<LocalDate, Map<String, Object>> groupedData = new LinkedHashMap<>();
         Map<Long, BigDecimal> runningActual = new HashMap<>();
+        // Cumulative "Total %" is measured against the *period* targets that have
+        // elapsed within the visible window, not an all-time fixed target.
+        Map<Long, BigDecimal> runningTarget = new HashMap<>();
+        Map<Long, Set<LocalDate>> countedPeriods = new HashMap<>();
 
-        // Seed the running cumulative total with entries that fall before the range
-        // so the cumulative line stays correct for the first pre-filled buckets.
+        // The cumulative "Total %" line accumulates only within the visible range
+        // (it starts at 0 at the range start and grows as entries are logged), so a
+        // new week begins at 0 instead of carrying over all-time history.
+        // Pre-fill every bucket in the bounded range so the x-axis is always full
+        // length and the cumulative line is continuous (including empty days).
         if (from != null) {
-            entries.stream()
-                    .filter(e -> e.getEntryDate().isBefore(from))
-                    .forEach(e -> runningActual.merge(e.getGoalId(), e.getActualValue(), BigDecimal::add));
-
-            // Pre-fill every weekly bucket in the bounded range so the x-axis is always full length.
             if (weekly) {
                 LocalDate bucket = startOfWeek(from);
                 while (!bucket.isAfter(to)) {
-                    ensureBucket(bucket, groupedData, goalTargets, runningActual, weekly);
+                    ensureBucket(bucket, groupedData, goalTargets, goalPeriods, runningActual, runningTarget, countedPeriods, weekly);
                     bucket = bucket.plusWeeks(1);
+                }
+            } else {
+                for (LocalDate day = from; !day.isAfter(to); day = day.plusDays(1)) {
+                    ensureBucket(day, groupedData, goalTargets, goalPeriods, runningActual, runningTarget, countedPeriods, weekly);
                 }
             }
         }
@@ -77,12 +87,15 @@ public class ChartDataService {
             long id = entry.getGoalId();
             BigDecimal target = goalTargets.getOrDefault(id, BigDecimal.ZERO);
             runningActual.merge(id, entry.getActualValue(), BigDecimal::add);
+            // Credit the period target the first time a new period is reached.
+            LocalDate periodStart = periodStartFor(id, goalPeriods, entry.getEntryDate());
+            creditPeriodTarget(id, periodStart, runningTarget, countedPeriods);
 
             String goalKey = "goal_" + id;
             bucketData.put(goalKey, calculatePercentage(entry));
 
-            BigDecimal totalProgress = (target.equals(BigDecimal.ZERO)) ? BigDecimal.ZERO :
-                    (runningActual.get(id).divide(target, 4, java.math.RoundingMode.HALF_UP)).multiply(BigDecimal.valueOf(100l)) ;
+            BigDecimal totalProgress = runningTarget.getOrDefault(id, BigDecimal.ZERO).compareTo(BigDecimal.ZERO) == 0 ? BigDecimal.ZERO :
+                    (runningActual.get(id).divide(runningTarget.get(id), 4, java.math.RoundingMode.HALF_UP)).multiply(BigDecimal.valueOf(100L));
             bucketData.put("total_" + id, totalProgress);
 
             BigDecimal effective = goalService.getEffectiveTarget(id, entry.getEntryDate());
@@ -92,6 +105,35 @@ public class ChartDataService {
         }
 
         return new ArrayList<>(groupedData.values());
+    }
+
+    private LocalDate periodStartFor(Long goalId, Map<Long, String> goalPeriods, LocalDate date) {
+        String period = goalPeriods.getOrDefault(goalId, "WEEK");
+        if (period == null) period = "WEEK";
+        switch (period.toUpperCase()) {
+            case "DAY":
+                return date;
+            case "WEEK":
+            case "WORKWEEK":
+                return startOfWeek(date);
+            case "WEEKEND":
+                return date.with(DayOfWeek.SATURDAY);
+            case "MONTH":
+                return date.withDayOfMonth(1);
+            case "YEAR":
+                return date.withDayOfYear(1);
+            default:
+                return startOfWeek(date);
+        }
+    }
+
+    private void creditPeriodTarget(Long goalId, LocalDate periodStart, Map<Long, BigDecimal> runningTarget,
+                                    Map<Long, Set<LocalDate>> countedPeriods) {
+        Set<LocalDate> counted = countedPeriods.computeIfAbsent(goalId, k -> new HashSet<>());
+        if (counted.add(periodStart)) {
+            BigDecimal target = goalService.getEffectiveTarget(goalId, periodStart);
+            runningTarget.merge(goalId, target, BigDecimal::add);
+        }
     }
 
     private LocalDate resolveFrom(String range, LocalDate anchor) {
@@ -118,15 +160,22 @@ public class ChartDataService {
     }
 
     private void ensureBucket(LocalDate bucket, Map<LocalDate, Map<String, Object>> groupedData,
-                              Map<Long, BigDecimal> goalTargets, Map<Long, BigDecimal> runningActual, boolean weekly) {
+                              Map<Long, BigDecimal> goalTargets, Map<Long, String> goalPeriods,
+                              Map<Long, BigDecimal> runningActual, Map<Long, BigDecimal> runningTarget,
+                              Map<Long, Set<LocalDate>> countedPeriods, boolean weekly) {
         groupedData.putIfAbsent(bucket, new LinkedHashMap<>());
         Map<String, Object> bucketData = groupedData.get(bucket);
 
         for (Map.Entry<Long, BigDecimal> t : goalTargets.entrySet()) {
             long id = t.getKey();
             BigDecimal target = t.getValue();
+            // Credit the period target for this prefilled bucket (an empty week).
+            LocalDate periodStart = periodStartFor(id, goalPeriods, bucket);
+            creditPeriodTarget(id, periodStart, runningTarget, countedPeriods);
             BigDecimal running = runningActual.getOrDefault(id, BigDecimal.ZERO);
-            BigDecimal totalProgress = (target.equals(BigDecimal.ZERO)) ? BigDecimal.ZERO : (running.divide(target, 4, java.math.RoundingMode.HALF_UP)).multiply(BigDecimal.valueOf(100L));
+            BigDecimal runningTgt = runningTarget.getOrDefault(id, BigDecimal.ZERO);
+            BigDecimal totalProgress = runningTgt.compareTo(BigDecimal.ZERO) == 0 ? BigDecimal.ZERO :
+                    (running.divide(runningTgt, 4, java.math.RoundingMode.HALF_UP)).multiply(BigDecimal.valueOf(100L));
             bucketData.putIfAbsent("goal_" + id, BigDecimal.ZERO);
             bucketData.put("total_" + id, totalProgress);
             bucketData.put("target_" + id, goalService.getEffectiveTarget(id, bucket));

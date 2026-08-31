@@ -13,6 +13,7 @@ interface GoalsViewProps {
   goals: Goal[];
   entries: DailyEntry[];
   totalsByGoalId: Map<number, number>;
+  weekTotalsByGoalId: Map<number, number>;
   selectedGoal: Goal | null;
   selectedGoalId: number | null;
   goalFilter: GoalFilter;
@@ -37,6 +38,7 @@ const GoalsView: React.FC<GoalsViewProps> = ({
   goals,
   entries,
   totalsByGoalId,
+  weekTotalsByGoalId,
   selectedGoal,
   selectedGoalId,
   goalFilter,
@@ -107,6 +109,7 @@ const GoalsView: React.FC<GoalsViewProps> = ({
           goals={goals}
           selectedGoalId={selectedGoalId}
           totalsByGoalId={totalsByGoalId}
+          weekTotalsByGoalId={weekTotalsByGoalId}
           onEdit={setEditingGoal}
           onDelete={onDeleteGoal}
           onSelect={onSelectGoal}

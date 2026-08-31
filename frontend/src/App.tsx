@@ -46,6 +46,7 @@ const App: React.FC = () => {
   const {
     entries,
     totalsByGoalId,
+    weekTotalsByGoalId,
     isLoading: isLoadingEntries,
     error: entriesError,
     refetch: refetchEntries,
@@ -164,6 +165,7 @@ const App: React.FC = () => {
                 goals={goals}
                 entries={entries}
                 totalsByGoalId={totalsByGoalId}
+                weekTotalsByGoalId={weekTotalsByGoalId}
                 selectedGoal={selectedGoal}
                 selectedGoalId={selectedGoalId}
                 goalFilter={goalFilter}
