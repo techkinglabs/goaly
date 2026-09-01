@@ -7,7 +7,6 @@ import org.techkinglabs.entity.DailyEntry;
 import org.techkinglabs.exception.ResourceNotFoundException;
 import org.techkinglabs.mapper.DailyEntryMapper;
 import org.techkinglabs.service.DailyEntryService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;

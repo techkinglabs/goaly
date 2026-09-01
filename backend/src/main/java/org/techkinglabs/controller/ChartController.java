@@ -1,51 +1,56 @@
 package org.techkinglabs.controller;
-import org.techkinglabs.dto.ChartDataResponse;
+
+import org.techkinglabs.dto.ChartDataPoint;
+import org.techkinglabs.entity.Goal;
+import org.techkinglabs.exception.ResourceNotFoundException;
+import org.techkinglabs.repository.GoalRepository;
 import org.techkinglabs.service.ChartDataService;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/chart")
 public class ChartController {
 
-    private final ChartDataService chartDataService;
+    private static final Set<String> ALLOWED_RANGES =
+            Set.of("7d", "30d", "365d", "week", "year", "all");
 
-    public ChartController(ChartDataService chartDataService) {
+    private final ChartDataService chartDataService;
+    private final GoalRepository goalRepository;
+
+    public ChartController(ChartDataService chartDataService, GoalRepository goalRepository) {
         this.chartDataService = chartDataService;
+        this.goalRepository = goalRepository;
     }
 
     @GetMapping("/data")
-    public List<ChartDataResponse> getChartData(
+    public List<ChartDataPoint> getChartData(
             @RequestParam(required = false) Long goalId,
             @RequestParam(required = false, defaultValue = "all") String range,
             @RequestParam(required = false) LocalDate anchor) {
+        if (!ALLOWED_RANGES.contains(range == null ? "" : range.toLowerCase())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Invalid range '" + range + "'. Allowed: 7d, 30d, 365d, week, year, all");
+        }
+        if (anchor != null && anchor.isAfter(LocalDate.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "anchor must not be in the future");
+        }
+        String normalizedRange = range == null ? null : range.toLowerCase();
+
         if (goalId != null) {
-            return chartDataService.getChartDataForGoal(goalId, range, anchor).stream()
-                    .map(this::toResponse)
-                    .collect(Collectors.toList());
+            Goal goal = goalRepository.findById(goalId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + goalId));
+            return chartDataService.getChartDataForGoal(goal, normalizedRange, anchor);
         }
 
-        return chartDataService.getChartDataForAllGoals(range, anchor).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-    }
-
-    private ChartDataResponse toResponse(Map<String, Object> data) {
-        String label = data.containsKey("weekStart")
-                ? (String) data.get("weekStart")
-                : (String) data.get("entryDate");
-        Map<String, Double> goals = data.entrySet().stream()
-                .filter(e -> e.getKey().startsWith("goal_"))
-                .collect(Collectors.toMap(Map.Entry::getKey, e -> ((Number) e.getValue()).doubleValue()));
-        Map<String, Double> totals = data.entrySet().stream()
-                .filter(e -> e.getKey().startsWith("total_"))
-                .collect(Collectors.toMap(Map.Entry::getKey, e -> ((Number) e.getValue()).doubleValue()));
-        return new ChartDataResponse(label, goals, totals);
+        return chartDataService.getChartDataForAllGoals(normalizedRange, anchor);
     }
 }
