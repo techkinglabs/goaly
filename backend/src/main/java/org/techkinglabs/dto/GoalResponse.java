@@ -1,5 +1,6 @@
 package org.techkinglabs.dto;
 
+import org.techkinglabs.model.Period;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -10,7 +11,7 @@ public record GoalResponse(
     BigDecimal targetValue,
     Boolean isActive,
     String description,
-    String period,
+    Period period,
     BigDecimal amountPerPeriod,
     List<TargetHistoryResponse> targetHistory
 ) {}

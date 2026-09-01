@@ -2,7 +2,7 @@ package org.techkinglabs.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-
+import org.techkinglabs.model.Period;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -29,8 +29,9 @@ public class TargetHistory {
     @Column(name = "valid_to")
     private LocalDate validTo;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "period", nullable = false)
-    private String period = "WEEK";
+    private Period period = Period.WEEK;
 
     @Column(name = "value", nullable = false)
     private BigDecimal value;

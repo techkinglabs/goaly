@@ -1,5 +1,6 @@
 package org.techkinglabs.dto;
 
+import org.techkinglabs.model.Period;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -9,5 +10,5 @@ public record TargetHistoryResponse(
     LocalDate validFrom,
     LocalDate validTo,
     BigDecimal value,
-    String period
+    Period period
 ) {}

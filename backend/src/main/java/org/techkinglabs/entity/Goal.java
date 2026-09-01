@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-
+import org.techkinglabs.model.Period;
 import java.math.BigDecimal;
 
 @Getter
@@ -30,15 +30,16 @@ public class Goal {
     @NotNull(message = "Target value is required")
     private BigDecimal targetValue;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "period", nullable = false)
-    private String period = "WEEK";
+    private Period period = Period.WEEK;
 
     @Column(name = "amount_per_period", nullable = false)
     private BigDecimal amountPerPeriod = BigDecimal.ZERO;
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
-    
+
     @Column(name = "description")
     private String description;
 }
