@@ -1,6 +1,6 @@
 # Personal Progress Tracker
 
-A web application for tracking wedockekly progress against personal goals using a template-and-entry data model.
+A web application for tracking weekly progress against personal goals using a template-and-entry data model.
 
 ## Project Structure
 
