@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { queryKeys } from '../lib/queryClient';
 import { chartService } from '../services/chartService';
-import type { ChartDataResponse, ChartRange } from '../types';
+import type { ChartDataPoint, ChartRange } from '../types';
 import { compareISODate } from '../utils/date';
 
 /** One row of the flattened line-chart dataset. */
@@ -11,7 +11,7 @@ export interface FlatChartRow {
   [seriesKey: string]: number | string;
 }
 
-const getLabel = (entry: ChartDataResponse): string => entry.entryDate ?? entry.weekStart ?? '';
+const getLabel = (entry: ChartDataPoint): string => entry.label ?? '';
 
 /**
  * Fetches aggregate chart data and memoizes the flattening transform.
@@ -33,9 +33,11 @@ export function useChartData(range: ChartRange, anchor = '') {
       .map((entry) => {
         const row: FlatChartRow = { label: getLabel(entry) };
         // Daily progress per goal: `goal_<id>`
-        for (const [key, value] of Object.entries(entry.goals)) row[key] = value;
+        for (const [key, value] of Object.entries(entry.goals)) row[`goal_${key}`] = value;
         // Cumulative progress per goal: `total_<id>`
-        for (const [key, value] of Object.entries(entry.totals)) row[key] = value;
+        for (const [key, value] of Object.entries(entry.totals)) row[`total_${key}`] = value;
+        // Target per goal: `target_<id>`
+        for (const [key, value] of Object.entries(entry.targets)) row[`target_${key}`] = value;
         return row;
       });
   }, [data]);

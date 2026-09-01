@@ -1,5 +1,5 @@
 import { buildQuery, http } from '../lib/http';
-import type { ChartDataResponse, ChartRange } from '../types';
+import type { ChartDataPoint, ChartRange } from '../types';
 
 /** Aggregated chart data from the backend. */
 export const chartService = {
@@ -7,8 +7,8 @@ export const chartService = {
     range?: ChartRange,
     anchor?: string,
     signal?: AbortSignal
-  ): Promise<ChartDataResponse[]> {
+  ): Promise<ChartDataPoint[]> {
     const query = buildQuery({ range, anchor });
-    return http.get<ChartDataResponse[]>(`/api/chart/data${query}`, signal);
+    return http.get<ChartDataPoint[]>(`/api/chart/data${query}`, signal);
   },
 };

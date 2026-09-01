@@ -1,7 +1,7 @@
 /** Shared domain model. Mirrors the backend DTOs. */
 import type { ISODateString } from '../utils/date';
 
-export const GOAL_PERIODS = ['YEAR', 'MONTH', 'WEEK', 'WORKWEEK', 'WEEKEND'] as const;
+export const GOAL_PERIODS = ['YEAR', 'MONTH', 'WEEK', 'WORKWEEK', 'WEEKEND', 'DAY'] as const;
 export type GoalPeriod = (typeof GOAL_PERIODS)[number];
 
 export const TARGET_PERIODS = ['DAY', 'WEEK', 'MONTH', 'YEAR'] as const;
@@ -19,7 +19,7 @@ export interface TargetHistoryEntry {
   validFrom: ISODateString;
   validTo?: ISODateString | null;
   value: number;
-  period?: TargetPeriod;
+  period?: GoalPeriod;
 }
 
 export interface Goal {
@@ -43,11 +43,11 @@ export interface DailyEntry {
   note?: string | null;
 }
 
-export interface ChartDataResponse {
-  weekStart?: ISODateString;
-  entryDate?: ISODateString;
-  goals: Record<string, number>;
-  totals: Record<string, number>;
+export interface ChartDataPoint {
+  label: string;
+  goals: Record<number, number>;
+  totals: Record<number, number>;
+  targets: Record<number, number>;
 }
 
 /** Write models — `id` is server-assigned, so it is never part of a payload. */
@@ -100,6 +100,7 @@ export const GOAL_PERIOD_LABELS: Record<GoalPeriod, string> = {
   WEEKEND: 'Per Weekend (2 days)',
   MONTH: 'Per Month',
   YEAR: 'Per Year',
+  DAY: 'Per Day',
 };
 
 /** Predefined unit options; anything else is entered as a custom unit. */

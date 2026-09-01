@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import type { Goal, TargetHistoryEntry, TargetPeriod } from '../../types';
-import { PERIOD_LABELS, TARGET_PERIODS } from '../../types';
+import type { Goal, GoalPeriod, TargetHistoryEntry } from '../../types';
+import { GOAL_PERIODS, PERIOD_LABELS } from '../../types';
 import { formatDate } from '../../utils/date';
 import { derivePeriodEquivalents } from '../../utils/goalMath';
 import { targetHistorySchema, validate } from '../../validation/schemas';
@@ -13,7 +13,7 @@ interface TargetHistoryInput {
   validFrom: string;
   validTo?: string | null;
   value: number;
-  period: TargetPeriod;
+  period: GoalPeriod;
 }
 
 interface GoalTargetHistoryProps {
@@ -28,7 +28,7 @@ interface FormState {
   validFrom: string;
   validTo: string;
   value: string;
-  period: TargetPeriod;
+  period: GoalPeriod;
 }
 
 const EMPTY_FORM: FormState = { validFrom: '', validTo: '', value: '', period: 'WEEK' };
@@ -201,12 +201,12 @@ const GoalTargetHistory: React.FC<GoalTargetHistoryProps> = ({
                 onChange={(event) =>
                   setAddForm((previous) => ({
                     ...previous,
-                    period: event.target.value as TargetPeriod,
+                     period: event.target.value as GoalPeriod,
                   }))
                 }
                 className="form-input mb-0"
               >
-                {TARGET_PERIODS.map((period) => (
+                {GOAL_PERIODS.map((period) => (
                   <option key={period} value={period}>
                     {PERIOD_LABELS[period]}
                   </option>
@@ -301,13 +301,13 @@ const GoalTargetHistory: React.FC<GoalTargetHistoryProps> = ({
                             onChange={(event) =>
                               setEditForm((previous) => ({
                                 ...previous,
-                                period: event.target.value as TargetPeriod,
+                                period: event.target.value as GoalPeriod,
                               }))
                             }
                             className="form-input mb-0"
                             aria-label="Target period"
                           >
-                            {TARGET_PERIODS.map((period) => (
+                            {GOAL_PERIODS.map((period) => (
                               <option key={period} value={period}>
                                 {PERIOD_LABELS[period]}
                               </option>

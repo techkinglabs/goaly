@@ -1,13 +1,13 @@
 import { buildQuery, http } from '../lib/http';
 import type { ISODateString } from '../utils/date';
-import type { TargetPeriod } from '../types';
+import type { GoalPeriod } from '../types';
 
 export interface TargetHistoryInput {
   goalId: number;
   validFrom: ISODateString;
   validTo?: ISODateString | null;
   value: number;
-  period?: TargetPeriod;
+  period?: GoalPeriod;
 }
 
 /**
