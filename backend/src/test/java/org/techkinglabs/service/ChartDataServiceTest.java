@@ -1,7 +1,10 @@
 package org.techkinglabs.service;
 
+import org.techkinglabs.dto.ChartDataPoint;
 import org.techkinglabs.entity.DailyEntry;
 import org.techkinglabs.entity.Goal;
+import org.techkinglabs.entity.TargetHistory;
+import org.techkinglabs.model.Period;
 import org.techkinglabs.repository.GoalRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,8 +13,10 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
@@ -29,6 +34,9 @@ class ChartDataServiceTest {
     @Mock
     private GoalService goalService;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private ChartDataService chartDataService;
 
@@ -37,88 +45,130 @@ class ChartDataServiceTest {
         MockitoAnnotations.openMocks(this);
     }
 
-    private DailyEntry entry(Long id, Long goalId, LocalDate date, double actual, double target) {
+    private DailyEntry entry(Long id, LocalDate date, double actual) {
         DailyEntry e = new DailyEntry();
         e.setId(id);
-        e.setGoalId(goalId);
+        e.setGoalId(1L);
         e.setEntryDate(date);
-        e.setActualValue(new BigDecimal(String.valueOf(actual)));
-        e.setTargetValue(new BigDecimal(String.valueOf(target)));
+        e.setActualValue(BigDecimal.valueOf(actual));
+        e.setTargetValue(BigDecimal.valueOf(10));
         return e;
     }
 
-    private Goal goal(Long id, double target) {
+    private Goal goal() {
         Goal g = new Goal();
-        g.setId(id);
-        g.setTargetValue(new BigDecimal(String.valueOf(target)));
+        g.setId(1L);
+        g.setTargetValue(BigDecimal.valueOf(10));
+        g.setPeriod(Period.WEEK);
         return g;
+    }
+
+    private TargetHistory history(LocalDate from) {
+        TargetHistory h = new TargetHistory();
+        h.setGoalId(1L);
+        h.setValidFrom(from);
+        h.setValue(BigDecimal.valueOf(10));
+        h.setPeriod(Period.WEEK);
+        return h;
     }
 
     @Test
     void testWeeklyBucketsStartOnMonday() {
+        LocalDate monday = LocalDate.of(2026, 1, 5);
+        when(clock.getZone()).thenReturn(ZoneId.of("UTC"));
+        when(clock.instant()).thenReturn(monday.atStartOfDay(ZoneId.of("UTC")).toInstant());
         when(dailyEntryService.getEntriesByGoalId(1L)).thenReturn(List.of(
-                entry(1L, 1L, LocalDate.of(2026, 1, 1), 5, 10),  // Thursday
-                entry(2L, 1L, LocalDate.of(2026, 1, 5), 5, 10)   // Monday
+                entry(1L, LocalDate.of(2026, 1, 1), 5),  // Thursday
+                entry(2L, monday, 5)   // Monday
         ));
-        when(goalRepository.findAll()).thenReturn(List.of(goal(1L, 10)));
-        when(goalService.getEffectiveTarget(1L, LocalDate.of(2026, 1, 1))).thenReturn(new BigDecimal("10"));
-        when(goalService.getEffectiveTarget(1L, LocalDate.of(2026, 1, 5))).thenReturn(new BigDecimal("10"));
+        Goal g = goal();
+        when(goalService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
+                history(LocalDate.of(2025, 12, 29))
+        )));
 
-        List<Map<String, Object>> series = chartDataService.getChartDataForGoal(1L, "week", LocalDate.of(2026, 1, 5));
+        List<ChartDataPoint> series = chartDataService.getChartDataForGoal(g, "week", monday);
 
         assertEquals(1, series.size());
-        LocalDate weekStart = LocalDate.of(2026, 1, 5); // Monday
-        assertEquals(weekStart.toString(), series.get(0).get("weekStart"));
-        assertEquals(DayOfWeek.MONDAY, LocalDate.parse((String) series.get(0).get("weekStart")).getDayOfWeek());
+        assertEquals(monday.toString(), series.getFirst().label());
+        assertEquals(DayOfWeek.MONDAY, LocalDate.parse(series.getFirst().label()).getDayOfWeek());
     }
 
     @Test
     void testDailyRangeFiltersBoundaries() {
         LocalDate anchor = LocalDate.of(2026, 2, 10);
-        when(dailyEntryService.getAllEntries()).thenReturn(List.of(
-                entry(1L, 1L, anchor.minusDays(7), 5, 10),   // outside (7d => from anchor-6)
-                entry(2L, 1L, anchor.minusDays(6), 5, 10),   // boundary inclusive
-                entry(3L, 1L, anchor, 5, 10)                  // boundary inclusive
+        when(clock.getZone()).thenReturn(ZoneId.of("UTC"));
+        when(clock.instant()).thenReturn(anchor.atStartOfDay(ZoneId.of("UTC")).toInstant());
+        when(dailyEntryService.getEntriesFrom(anchor.minusDays(6))).thenReturn(List.of(
+                entry(2L, anchor.minusDays(6), 5),   // boundary inclusive
+                entry(3L, anchor, 5)                  // boundary inclusive
         ));
-        when(goalRepository.findAll()).thenReturn(List.of(goal(1L, 10)));
-        when(goalService.getEffectiveTarget(anyLong(), any())).thenReturn(new BigDecimal("10"));
+        when(goalRepository.findAll()).thenReturn(List.of(goal()));
+        when(goalService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
+                history(LocalDate.of(2026, 1, 1))
+        )));
 
-        List<Map<String, Object>> series = chartDataService.getChartDataForAllGoals("7d", anchor);
+        List<ChartDataPoint> series = chartDataService.getChartDataForAllGoals("7d", anchor);
 
-        // Every day in the window is pre-filled (anchor-6 .. anchor = 7 days),
-        // so the cumulative line is continuous even when some days have no entry.
         assertEquals(7, series.size());
     }
 
     @Test
     void testCumulativePercentNotClippedAbove100() {
+        LocalDate tuesday = LocalDate.of(2026, 3, 3);
+        when(clock.getZone()).thenReturn(ZoneId.of("UTC"));
+        when(clock.instant()).thenReturn(tuesday.atStartOfDay(ZoneId.of("UTC")).toInstant());
         when(dailyEntryService.getEntriesByGoalId(1L)).thenReturn(List.of(
-                entry(1L, 1L, LocalDate.of(2026, 3, 2), 6, 10), // Monday
-                entry(2L, 1L, LocalDate.of(2026, 3, 3), 6, 10)  // Tuesday, same week
+                entry(1L, LocalDate.of(2026, 3, 2), 6), // Monday
+                entry(2L, tuesday, 6)  // Tuesday, same week
         ));
-        when(goalRepository.findAll()).thenReturn(List.of(goal(1L, 10)));
-        when(goalService.getEffectiveTarget(anyLong(), any())).thenReturn(new BigDecimal("10"));
+        Goal g = goal();
+        when(goalService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
+                history(LocalDate.of(2026, 2, 23))
+        )));
 
-        // Both entries fall in one week, so the cumulative denominator is a single
-        // weekly target (10); 12 done vs 10 target = 120% (not clipped at 100%).
-        List<Map<String, Object>> series = chartDataService.getChartDataForGoal(1L, "all", LocalDate.of(2026, 3, 3));
+        List<ChartDataPoint> series = chartDataService.getChartDataForGoal(g, "all", tuesday);
 
-        Object last = series.get(series.size() - 1).get("total_1");
-        assertTrue(last instanceof Number);
-        double cumulative = ((Number) last).doubleValue();
+        double cumulative = series.getLast().totals().get(1L);
         assertEquals(120.0, cumulative, 0.0001);
     }
 
     @Test
     void testPerEntryPercentage() {
+        LocalDate date = LocalDate.of(2026, 3, 1);
+        when(clock.getZone()).thenReturn(ZoneId.of("UTC"));
+        when(clock.instant()).thenReturn(date.atStartOfDay(ZoneId.of("UTC")).toInstant());
         when(dailyEntryService.getEntriesByGoalId(1L)).thenReturn(List.of(
-                entry(1L, 1L, LocalDate.of(2026, 3, 1), 5, 10)
+                entry(1L, date, 5)
         ));
-        when(goalRepository.findAll()).thenReturn(List.of(goal(1L, 10)));
-        when(goalService.getEffectiveTarget(anyLong(), any())).thenReturn(new BigDecimal("10"));
+        Goal g = goal();
+        when(goalService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
+                history(LocalDate.of(2026, 2, 22))
+        )));
 
-        List<Map<String, Object>> series = chartDataService.getChartDataForGoal(1L, "all", LocalDate.of(2026, 3, 1));
+        List<ChartDataPoint> series = chartDataService.getChartDataForGoal(g, "all", date);
 
-        assertEquals(50.0, ((Number) series.get(0).get("goal_1")).doubleValue(), 0.0001);
+        assertEquals(50.0, series.getFirst().goals().get(1L), 0.0001);
+    }
+
+    @Test
+    void testCumulativeTotalUsesPeriodTargetNotFixedGoalTarget() {
+        LocalDate week1Mon = LocalDate.of(2026, 3, 2);   // Monday
+        LocalDate week2Mon = week1Mon.plusWeeks(1);       // Monday
+        Goal g = goal();
+        when(clock.getZone()).thenReturn(ZoneId.of("UTC"));
+        when(clock.instant()).thenReturn(week2Mon.atStartOfDay(ZoneId.of("UTC")).toInstant());
+        when(dailyEntryService.getEntriesByGoalId(1L)).thenReturn(List.of(
+                entry(1L, week1Mon, 5),
+                entry(2L, week2Mon, 5)
+        ));
+        when(goalService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
+                history(LocalDate.of(2026, 2, 23))
+        )));
+
+        List<ChartDataPoint> series = chartDataService.getChartDataForGoal(g, "all", week2Mon);
+
+        assertEquals(2, series.size());
+        assertEquals(50.0, series.get(0).totals().get(1L), 0.0001);
+        assertEquals(50.0, series.get(1).totals().get(1L), 0.0001);
     }
 }

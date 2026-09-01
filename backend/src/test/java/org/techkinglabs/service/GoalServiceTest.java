@@ -2,6 +2,7 @@ package org.techkinglabs.service;
 
 import org.techkinglabs.entity.Goal;
 import org.techkinglabs.entity.TargetHistory;
+import org.techkinglabs.model.Period;
 import org.techkinglabs.repository.GoalRepository;
 import org.techkinglabs.repository.TargetHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,6 +45,7 @@ class GoalServiceTest {
         goal.setUnit("hours");
         goal.setTargetValue(new BigDecimal("8"));
         goal.setAmountPerPeriod(new BigDecimal("8"));
+        goal.setPeriod(Period.WEEK);
 
         when(goalRepository.save(goal)).thenReturn(goal);
 
@@ -86,13 +88,13 @@ class GoalServiceTest {
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> goalService.addTargetHistory(goalId, LocalDate.of(2026, 1, 10), LocalDate.of(2026, 1, 1),
-                        new BigDecimal("5"), "WEEK"));
+                        new BigDecimal("5"), Period.WEEK));
         assertTrue(ex.getMessage().contains("validTo"));
         verify(targetHistoryRepository, never()).save(any());
     }
 
     @Test
-    void testUpdateTargetHistoryRejectsOverlappingValidFrom() {
+    void testUpdateTargetHistoryRejectsMoveIntoPreviousRange() {
         Long goalId = 1L;
         Long historyId = 2L;
         TargetHistory history = new TargetHistory();
@@ -101,17 +103,14 @@ class GoalServiceTest {
         history.setValidFrom(LocalDate.of(2026, 1, 5));
         when(targetHistoryRepository.findById(historyId)).thenReturn(Optional.of(history));
 
-        TargetHistory previous = new TargetHistory();
-        previous.setId(1L);
-        previous.setGoalId(goalId);
-        previous.setValidFrom(LocalDate.of(2026, 1, 3));
-        when(targetHistoryRepository.findFirstByGoalIdAndValidFromLessThanOrderByValidFromDesc(goalId, LocalDate.of(2026, 1, 3)))
-                .thenReturn(Optional.of(previous));
+        // Moving validFrom to 2026-01-03 falls inside the previous entry [01-01, 01-04].
+        when(targetHistoryRepository.findOverlapping(goalId, LocalDate.of(2026, 1, 3), historyId))
+                .thenReturn(Optional.of(new TargetHistory()));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
                 () -> goalService.updateTargetHistory(goalId, historyId, LocalDate.of(2026, 1, 3),
-                        null, new BigDecimal("5"), "WEEK"));
-        assertTrue(ex.getMessage().contains("validFrom"));
+                        null, new BigDecimal("5"), Period.WEEK));
+        assertTrue(ex.getMessage().contains("overlaps"));
         verify(targetHistoryRepository, never()).save(any());
     }
 
@@ -124,22 +123,46 @@ class GoalServiceTest {
         history.setGoalId(goalId);
         history.setValidFrom(LocalDate.of(2026, 1, 10));
         when(targetHistoryRepository.findById(historyId)).thenReturn(Optional.of(history));
+        when(targetHistoryRepository.save(any(TargetHistory.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         TargetHistory previous = new TargetHistory();
         previous.setId(1L);
         previous.setGoalId(goalId);
         previous.setValidFrom(LocalDate.of(2026, 1, 5));
-        when(targetHistoryRepository.findFirstByGoalIdAndValidFromLessThanOrderByValidFromDesc(goalId, LocalDate.of(2026, 1, 15)))
-                .thenReturn(Optional.of(previous));
+        previous.setValidTo(LocalDate.of(2026, 1, 9));
+        when(targetHistoryRepository.findOverlapping(goalId, LocalDate.of(2026, 1, 15), historyId))
+                .thenReturn(Optional.empty());
         when(targetHistoryRepository.findByGoalIdOrderByValidFromAsc(goalId))
                 .thenReturn(java.util.List.of(previous, history));
 
         goalService.updateTargetHistory(goalId, historyId, LocalDate.of(2026, 1, 15),
-                null, new BigDecimal("5"), "WEEK");
+                null, new BigDecimal("5"), Period.WEEK);
 
         verify(targetHistoryRepository).saveAll(argThat(list -> {
-            TargetHistory prev = ((List<TargetHistory>) list).get(0);
-            return prev.getValidTo() != null && prev.getValidTo().equals(LocalDate.of(2026, 1, 15));
+            List<TargetHistory> cast = (List<TargetHistory>) list;
+            TargetHistory prev = cast.get(0);
+            TargetHistory hist = cast.get(1);
+            return prev.getValidTo() != null && prev.getValidTo().equals(LocalDate.of(2026, 1, 14))
+                    && hist.getValidTo() == null;
         }));
+    }
+
+    @Test
+    void testUpdateTargetHistoryRejectsStrictOverlap() {
+        Long goalId = 1L;
+        Long historyId = 3L;
+        TargetHistory history = new TargetHistory();
+        history.setId(historyId);
+        history.setGoalId(goalId);
+        history.setValidFrom(LocalDate.of(2026, 1, 10));
+        when(targetHistoryRepository.findById(historyId)).thenReturn(Optional.of(history));
+        when(targetHistoryRepository.findOverlapping(goalId, LocalDate.of(2026, 1, 7), historyId))
+                .thenReturn(Optional.of(new TargetHistory()));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> goalService.updateTargetHistory(goalId, historyId, LocalDate.of(2026, 1, 7),
+                        null, new BigDecimal("5"), Period.WEEK));
+        assertTrue(ex.getMessage().contains("overlaps"));
+        verify(targetHistoryRepository, never()).save(any());
     }
 }

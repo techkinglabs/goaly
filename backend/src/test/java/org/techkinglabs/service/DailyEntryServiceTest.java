@@ -10,7 +10,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -29,12 +32,17 @@ class DailyEntryServiceTest {
     @Mock
     private GoalService goalService;
 
+    @Mock
+    private Clock clock;
+
     @InjectMocks
     private DailyEntryService dailyEntryService;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        when(clock.getZone()).thenReturn(ZoneId.of("UTC"));
+        when(clock.instant()).thenReturn(Instant.parse("2026-01-01T00:00:00Z"));
     }
 
     @Test
@@ -57,7 +65,7 @@ class DailyEntryServiceTest {
     void testCreateDailyEntrySnapshotsEffectiveTarget() {
         DailyEntry entry = new DailyEntry();
         entry.setGoalId(1L);
-        entry.setEntryDate(LocalDate.now());
+        entry.setEntryDate(LocalDate.of(2026, 1, 1));
         entry.setActualValue(new BigDecimal("5"));
         entry.setTargetValue(new BigDecimal("8"));
 
@@ -75,7 +83,7 @@ class DailyEntryServiceTest {
     }
 
     @Test
-    void testUpdateDailyEntryDuplicateDateThrows() {
+    void testUpdateDailyEntryAllowsSameDateForDifferentEntry() {
         DailyEntry existing = new DailyEntry();
         existing.setId(1L);
         existing.setGoalId(1L);
@@ -88,12 +96,13 @@ class DailyEntryServiceTest {
 
         Goal goal = mock(Goal.class);
         when(goalRepository.findById(moved.getGoalId())).thenReturn(Optional.of(goal));
-        when(dailyEntryRepository.existsByGoalIdAndEntryDateAndIdNot(
-                moved.getGoalId(), moved.getEntryDate(), moved.getId())).thenReturn(true);
+        when(goalService.getEffectiveTarget(moved.getGoalId(), moved.getEntryDate())).thenReturn(new BigDecimal("9"));
+        when(dailyEntryRepository.save(moved)).thenReturn(moved);
 
-        assertThrows(org.techkinglabs.exception.DuplicateDayException.class,
-                () -> dailyEntryService.updateDailyEntryInDb(moved));
-        verify(dailyEntryRepository, never()).save(any());
+        DailyEntry result = dailyEntryService.updateDailyEntryInDb(moved);
+
+        assertEquals(new BigDecimal("9"), result.getTargetValue());
+        verify(dailyEntryRepository).save(moved);
     }
 
     @Test
