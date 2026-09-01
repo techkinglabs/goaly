@@ -5,6 +5,7 @@ import org.techkinglabs.dto.GoalRequest;
 import org.techkinglabs.dto.TargetHistoryResponse;
 import org.techkinglabs.entity.Goal;
 import org.techkinglabs.entity.TargetHistory;
+import org.techkinglabs.model.Period;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -51,7 +52,7 @@ public class GoalMapper {
         goal.setTargetValue(request.targetValue());
         goal.setIsActive(request.isActive() != null ? request.isActive() : true);
         goal.setDescription(request.description());
-        goal.setPeriod(request.period() != null ? request.period() : "WEEK");
+        goal.setPeriod(request.period() != null ? request.period() : Period.WEEK);
         goal.setAmountPerPeriod(request.amountPerPeriod() != null ? request.amountPerPeriod() : BigDecimal.ZERO);
         return goal;
     }
