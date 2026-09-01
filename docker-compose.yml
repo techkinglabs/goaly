@@ -1,21 +1,40 @@
-# PostgreSQL is an EXTERNAL database (see project-overview.md).
-# Do NOT define a postgres service here. Provide DB_URL/DB_USER/DB_PASSWORD
-# in your .env pointing to your external PostgreSQL instance.
+# Main compose: PostgreSQL runs as an INTERNAL service (named volume persistence).
+# The backend connects to it via the in-network "postgres" host.
+# For the previous external-DB setup, use docker-compose.external-db.yml.
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-goaly_db}
+      POSTGRES_USER: ${POSTGRES_USER:-goaly_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-goaly_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-goaly_user} -d ${POSTGRES_DB:-weekly_progress_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
       args:
         SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-    ports:
-      - "8081:8080"
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-      SPRING_DATASOURCE_URL: ${DB_URL}
-      SPRING_DATASOURCE_USERNAME: ${DB_USER}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-goaly_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-goaly_user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-goaly_password}
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - app-network
 
@@ -33,3 +52,6 @@ services:
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  postgres-data:

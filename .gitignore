@@ -31,7 +31,7 @@ backend/target/
 *.log
 *.class
 
-# Kilo Code
+# Application cache
 .kilo/
 # build artifacts
 temp_build/
@@ -46,3 +46,7 @@ nazov.todo.md
 otazky-od-meta.md
 readme2.md
 todo-od-meta*.md
+/gemma-review.md
+/improvements.md
+/review.md
+/todo.md
