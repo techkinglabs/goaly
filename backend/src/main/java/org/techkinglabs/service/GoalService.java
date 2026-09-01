@@ -4,6 +4,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.techkinglabs.entity.Goal;
 import org.techkinglabs.entity.TargetHistory;
 import org.techkinglabs.exception.ResourceNotFoundException;
+import org.techkinglabs.model.Period;
 import org.techkinglabs.repository.GoalRepository;
 import org.techkinglabs.repository.TargetHistoryRepository;
 import org.techkinglabs.repository.DailyEntryRepository;
@@ -11,7 +12,9 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class GoalService {
@@ -47,15 +50,15 @@ public class GoalService {
     public Goal createGoal(Goal goal) {
         Goal saved = goalRepository.save(goal);
 
-        BigDecimal seedValue = goal.getAmountPerPeriod() != null ? goal.getAmountPerPeriod() : goal.getTargetValue();
-        if (seedValue == null) {
-            seedValue = BigDecimal.ZERO;
-        }
+        BigDecimal seedValue = Optional.ofNullable(goal.getAmountPerPeriod())
+                .or(() -> Optional.ofNullable(goal.getTargetValue()))
+                .orElse(BigDecimal.ZERO);
 
         TargetHistory history = new TargetHistory();
         history.setGoalId(saved.getId());
         history.setValidFrom(LocalDate.now());
         history.setValue(seedValue);
+        history.setPeriod(saved.getPeriod());
         targetHistoryRepository.save(history);
 
         saved.setTargetValue(seedValue);
@@ -72,8 +75,7 @@ public class GoalService {
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
 
         dailyEntryRepository.deleteByGoalId(id);
-        targetHistoryRepository.findByGoalIdOrderByValidFromAsc(id)
-                .forEach(targetHistoryRepository::delete);
+        targetHistoryRepository.deleteByGoalId(id);
 
         goalRepository.delete(goal);
     }
@@ -82,12 +84,19 @@ public class GoalService {
         return targetHistoryRepository.findByGoalIdOrderByValidFromAsc(goalId);
     }
 
+    public Map<Long, List<TargetHistory>> getTargetHistoryByGoalIds(List<Long> goalIds) {
+        if (goalIds == null || goalIds.isEmpty()) {
+            return Map.of();
+        }
+        List<TargetHistory> histories = targetHistoryRepository.findByGoalIdInOrderByGoalIdAscValidFromAsc(goalIds);
+        return histories.stream().collect(Collectors.groupingBy(TargetHistory::getGoalId));
+    }
+
     @Transactional
-    public TargetHistory addTargetHistory(Long goalId, LocalDate validFrom, LocalDate validTo, BigDecimal value, String period) {
+    public TargetHistory addTargetHistory(Long goalId, LocalDate validFrom, LocalDate validTo, BigDecimal value, Period period) {
         Goal goal = goalRepository.findById(goalId)
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + goalId));
 
-        String normalizedPeriod = normalizePeriod(period);
         if (validTo != null && validTo.isBefore(validFrom)) {
             throw new IllegalArgumentException("validTo must not be before validFrom");
         }
@@ -97,82 +106,100 @@ public class GoalService {
         if (existing.isPresent() && existing.get().getValidFrom().isEqual(validFrom)) {
             history = existing.get();
             history.setValue(value);
-            history.setPeriod(normalizedPeriod);
+            history.setPeriod(period);
             if (validTo != null) {
                 history.setValidTo(validTo);
             }
+            TargetHistory overlapping = targetHistoryRepository
+                    .findOverlapping(goalId, validTo, history.getId())
+                    .orElse(null);
+            if (overlapping != null) {
+                throw new IllegalArgumentException("validTo " + validTo + " overlaps an existing target history on goal " + goalId);
+            }
         } else {
+            TargetHistory overlapping = targetHistoryRepository
+                    .findOverlapping(goalId, validFrom, null)
+                    .orElse(null);
+            if (overlapping != null) {
+                throw new IllegalArgumentException("validFrom " + validFrom + " overlaps an existing target history on goal " + goalId);
+            }
             history = new TargetHistory();
             history.setGoalId(goalId);
             history.setValidFrom(validFrom);
             history.setValidTo(validTo);
             history.setValue(value);
-            history.setPeriod(normalizedPeriod);
+            history.setPeriod(period);
+            if (validTo != null) {
+                TargetHistory next = targetHistoryRepository
+                        .findFirstByGoalIdAndValidFromGreaterThanOrderByValidFromAsc(goalId, validFrom)
+                        .orElse(null);
+                if (next != null && !validTo.isBefore(next.getValidFrom())) {
+                    throw new IllegalArgumentException("validTo " + validTo + " overlaps with target history starting on " + next.getValidFrom());
+                }
+            }
         }
         TargetHistory saved = targetHistoryRepository.save(history);
 
-        targetHistoryRepository.findFirstByGoalIdAndValidFromLessThanOrderByValidFromDesc(goalId, validFrom)
-                .ifPresent(prev -> {
-                    prev.setValidTo(validFrom.minusDays(1));
-                    targetHistoryRepository.save(prev);
-                });
+        relinkTargetHistory(goalId);
 
         if (validFrom != null && !validFrom.isAfter(LocalDate.now())) {
-            goal.setAmountPerPeriod(value);
-            goal.setPeriod(normalizedPeriod);
-            goal.setTargetValue(value);
-            goalRepository.save(goal);
+            applyEffectiveTarget(goal, value, period);
         }
 
-        return saved;
+        return targetHistoryRepository.findById(saved.getId()).orElse(saved);
     }
 
-    public TargetHistory updateTargetHistory(Long goalId, Long historyId, LocalDate validFrom, LocalDate validTo, BigDecimal value, String period) {
+    @Transactional
+    public TargetHistory updateTargetHistory(Long goalId, Long historyId, LocalDate validFrom, LocalDate validTo, BigDecimal value, Period period) {
         TargetHistory history = targetHistoryRepository.findById(historyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Target history not found with id: " + historyId));
         if (!goalId.equals(history.getGoalId())) {
             throw new ResourceNotFoundException("Target history not found with id: " + historyId);
         }
-        String normalizedPeriod = normalizePeriod(period);
         if (validTo != null && validTo.isBefore(validFrom)) {
             throw new IllegalArgumentException("validTo must not be before validFrom");
         }
-        TargetHistory previous = targetHistoryRepository
-                .findFirstByGoalIdAndValidFromLessThanOrderByValidFromDesc(goalId, validFrom)
+        TargetHistory overlapping = targetHistoryRepository
+                .findOverlapping(goalId, validFrom, history.getId())
                 .orElse(null);
-        if (previous != null && previous.getId() != null && !previous.getId().equals(historyId)
-                && !validFrom.isAfter(previous.getValidFrom())) {
-            throw new IllegalArgumentException("validFrom must be after the previous history entry's validFrom");
+        if (overlapping != null) {
+            throw new IllegalArgumentException("validFrom " + validFrom + " overlaps an existing target history on goal " + goalId);
+        }
+        if (validTo != null) {
+            TargetHistory next = targetHistoryRepository
+                    .findFirstByGoalIdAndValidFromGreaterThanOrderByValidFromAsc(goalId, validFrom)
+                    .orElse(null);
+            if (next != null && !validTo.isBefore(next.getValidFrom())) {
+                throw new IllegalArgumentException("validTo " + validTo + " overlaps with target history starting on " + next.getValidFrom());
+            }
         }
         history.setValidFrom(validFrom);
         history.setValidTo(validTo);
         history.setValue(value);
-        history.setPeriod(normalizedPeriod);
+        history.setPeriod(period);
         TargetHistory saved = targetHistoryRepository.save(history);
         relinkTargetHistory(goalId);
-        return saved;
+        return targetHistoryRepository.findById(saved.getId()).orElse(saved);
     }
 
     void relinkTargetHistory(Long goalId) {
         List<TargetHistory> entries = targetHistoryRepository.findByGoalIdOrderByValidFromAsc(goalId);
         for (int i = 0; i < entries.size(); i++) {
             LocalDate nextFrom = (i + 1 < entries.size()) ? entries.get(i + 1).getValidFrom() : null;
-            assert nextFrom != null;
-            entries.get(i).setValidTo(nextFrom.minusDays(1));
+            if (nextFrom != null) {
+                entries.get(i).setValidTo(nextFrom.minusDays(1));
+            } else {
+                entries.get(i).setValidTo(null);
+            }
         }
         targetHistoryRepository.saveAll(entries);
     }
 
-    private String normalizePeriod(String period) {
-        if (period == null) return "WEEK";
-        return switch (period.toUpperCase()) {
-            case "DAY", "DAILY", "D" -> "DAY";
-            case "MONTH", "MONTHLY", "M" -> "MONTH";
-            case "YEAR", "YEARLY", "ANNUAL", "Y" -> "YEAR";
-            case "WORKWEEK", "WORK_WEEK", "WW" -> "WORKWEEK";
-            case "WEEKEND", "WE" -> "WEEKEND";
-            default -> "WEEK";
-        };
+    private void applyEffectiveTarget(Goal goal, BigDecimal value, Period period) {
+        goal.setAmountPerPeriod(value);
+        goal.setPeriod(period);
+        goal.setTargetValue(value);
+        goalRepository.save(goal);
     }
 
     public BigDecimal getEffectiveTarget(Long goalId, LocalDate date) {

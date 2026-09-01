@@ -2,28 +2,31 @@ package org.techkinglabs.service;
 
 import org.techkinglabs.entity.DailyEntry;
 import org.techkinglabs.entity.Goal;
-import org.techkinglabs.exception.DuplicateDayException;
 import org.techkinglabs.exception.ResourceNotFoundException;
 import org.techkinglabs.repository.DailyEntryRepository;
 import org.techkinglabs.repository.GoalRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 @Service
 public class DailyEntryService {
 
-    @Autowired
-    private DailyEntryRepository dailyEntryRepository;
+    private final DailyEntryRepository dailyEntryRepository;
+    private final GoalRepository goalRepository;
+    private final GoalService goalService;
+    private final Clock clock;
 
-    @Autowired
-    private GoalRepository goalRepository;
+    public DailyEntryService(DailyEntryRepository dailyEntryRepository, GoalRepository goalRepository, GoalService goalService, Clock clock) {
+        this.dailyEntryRepository = dailyEntryRepository;
+        this.goalRepository = goalRepository;
+        this.goalService = goalService;
+        this.clock = clock;
+    }
 
-    @Autowired
-    private GoalService goalService;
 
     public List<DailyEntry> getEntriesByGoalId(Long goalId) {
         return dailyEntryRepository.findByGoalIdOrderByEntryDate(goalId);
@@ -33,11 +36,22 @@ public class DailyEntryService {
         return dailyEntryRepository.findAll();
     }
 
+    public List<DailyEntry> getEntriesFrom(LocalDate from) {
+        if (from == null) {
+            return dailyEntryRepository.findAll();
+        }
+        return dailyEntryRepository.findByEntryDateGreaterThanEqualOrderByEntryDate(from);
+    }
+
     public Optional<DailyEntry> getEntryById(Long id) {
         return dailyEntryRepository.findById(id);
     }
 
     public DailyEntry createDailyEntry(DailyEntry entry) {
+        if (entry.getEntryDate().isAfter(LocalDate.now(clock))) {
+            throw new IllegalArgumentException("Entry date must not be in the future");
+        }
+
         Goal goal = goalRepository.findById(entry.getGoalId())
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + entry.getGoalId()));
 
@@ -50,11 +64,6 @@ public class DailyEntryService {
     public DailyEntry updateDailyEntryInDb(DailyEntry entry) {
         Goal goal = goalRepository.findById(entry.getGoalId())
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + entry.getGoalId()));
-
-        if (dailyEntryRepository.existsByGoalIdAndEntryDateAndIdNot(
-                entry.getGoalId(), entry.getEntryDate(), entry.getId())) {
-            throw new DuplicateDayException("An entry for this goal on " + entry.getEntryDate() + " already exists");
-        }
 
         BigDecimal effectiveTarget = goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
         entry.setTargetValue(effectiveTarget);
