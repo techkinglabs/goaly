@@ -13,10 +13,6 @@ import java.util.List;
 public interface DailyEntryRepository extends JpaRepository<DailyEntry, Long> {
     List<DailyEntry> findByGoalIdOrderByEntryDate(Long goalId);
 
-    boolean existsByGoalIdAndEntryDate(Long goalId, LocalDate entryDate);
-
-    boolean existsByGoalIdAndEntryDateAndIdNot(Long goalId, LocalDate entryDate, Long id);
-
     @Modifying
     @Query("delete from DailyEntry d where d.goalId = :goalId")
     void deleteByGoalId(Long goalId);

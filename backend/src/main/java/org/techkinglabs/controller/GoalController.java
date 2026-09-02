@@ -12,7 +12,6 @@ import org.techkinglabs.model.Period;
 import org.techkinglabs.service.GoalService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.techkinglabs.service.TargetHistoryService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -25,11 +24,8 @@ public class GoalController {
 
     private final GoalService goalService;
 
-    private final TargetHistoryService targetHistoryService;
-
-    public GoalController(GoalService goalService, TargetHistoryService targetHistoryService) {
+    public GoalController(GoalService goalService) {
         this.goalService = goalService;
-        this.targetHistoryService = targetHistoryService;
     }
 
     @GetMapping
@@ -78,7 +74,7 @@ public class GoalController {
             @RequestParam BigDecimal value,
             @RequestParam(required = false, defaultValue = "WEEK") String period) {
         Period parsedPeriod = Period.fromValue(period);
-        TargetHistory history = targetHistoryService.addTargetHistory(id, validFrom, validTo, value, parsedPeriod);
+        TargetHistory history = goalService.addTargetHistory(id, validFrom, validTo, value, parsedPeriod);
         return ResponseEntity.status(201).body(GoalMapper.toTargetHistoryResponse(history));
     }
 
@@ -98,13 +94,13 @@ public class GoalController {
             @RequestParam BigDecimal value,
             @RequestParam(required = false, defaultValue = "WEEK") String period) {
         Period parsedPeriod = Period.fromValue(period);
-        TargetHistory history = targetHistoryService.updateTargetHistory(id, historyId, validFrom, validTo, value, parsedPeriod);
+        TargetHistory history = goalService.updateTargetHistory(id, historyId, validFrom, validTo, value, parsedPeriod);
         return ResponseEntity.ok(GoalMapper.toTargetHistoryResponse(history));
     }
 
     @DeleteMapping("/{id}/target/{historyId}")
     public ResponseEntity<Void> deleteTargetHistory(@PathVariable Long id, @PathVariable Long historyId) {
-        targetHistoryService.deleteTargetHistory(id, historyId);
+        goalService.deleteTargetHistory(id, historyId);
         return ResponseEntity.noContent().build();
     }
 }

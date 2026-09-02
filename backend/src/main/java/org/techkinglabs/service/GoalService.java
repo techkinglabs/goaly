@@ -31,10 +31,6 @@ public class GoalService {
         this.dailyEntryRepository = dailyEntryRepository;
     }
 
-    public List<Goal> getAllActiveGoals() {
-        return goalRepository.findByIsActiveTrue();
-    }
-
     public List<Goal> getGoals(Boolean active) {
         if (active == null) {
             return goalRepository.findAll();
@@ -207,5 +203,15 @@ public class GoalService {
                 .findFirstByGoalIdAndValidFromLessThanEqualOrderByValidFromDesc(goalId, date)
                 .map(TargetHistory::getValue)
                 .orElse(BigDecimal.ZERO);
+    }
+
+    public void deleteTargetHistory(Long id, Long historyId) {
+        TargetHistory history = targetHistoryRepository.findById(historyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Target history not found with id: " + historyId));
+        if (!id.equals(history.getGoalId())) {
+            throw new ResourceNotFoundException("Target history not found with id: " + historyId);
+        }
+        targetHistoryRepository.delete(history);
+        this.relinkTargetHistory(id);
     }
 }

@@ -2,7 +2,6 @@ package org.techkinglabs.controller;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.techkinglabs.exception.DuplicateDayException;
 import org.techkinglabs.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,13 +19,6 @@ public class GlobalExceptionHandler {
         log.info("Resource not found: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Map.of("error", "Not Found", "message", ex.getMessage()));
-    }
-
-    @ExceptionHandler(DuplicateDayException.class)
-    public ResponseEntity<Map<String, Object>> handleDuplicateDay(DuplicateDayException ex) {
-        log.info("Duplicate day conflict: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(Map.of("error", "Conflict", "message", ex.getMessage()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
