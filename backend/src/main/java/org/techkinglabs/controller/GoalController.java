@@ -1,6 +1,7 @@
 package org.techkinglabs.controller;
 
 import jakarta.validation.Valid;
+import org.springframework.transaction.annotation.Transactional;
 import org.techkinglabs.dto.GoalRequest;
 import org.techkinglabs.dto.GoalResponse;
 import org.techkinglabs.dto.TargetHistoryResponse;
@@ -29,7 +30,7 @@ public class GoalController {
     }
 
     @GetMapping
-    public List<GoalResponse> getAllActiveGoals(@RequestParam(required = false) Boolean active) {
+    public List<GoalResponse> getAllGoals(@RequestParam(required = false) Boolean active) {
         List<Goal> goals = goalService.getGoals(active);
         List<Long> goalIds = goals.stream().map(Goal::getId).toList();
         Map<Long, List<TargetHistory>> histories = goalService.getTargetHistoryByGoalIds(goalIds);
@@ -56,8 +57,15 @@ public class GoalController {
     public ResponseEntity<GoalResponse> updateGoal(@PathVariable Long id, @RequestBody @Valid GoalRequest goalRequest) {
         Goal goal = goalService.getGoalById(id).orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
         GoalMapper.updateEntityFromRequest(goalRequest, goal);
-        Goal updatedGoal = goalService.updateGoal(goal);
+        Goal updatedGoal = goalService.updateGoal(goal, effectiveSeedValue(goal, goalRequest.amountPerPeriod()));
         return ResponseEntity.ok(GoalMapper.toResponse(updatedGoal, goalService.getTargetHistory(updatedGoal.getId())));
+    }
+
+    private BigDecimal effectiveSeedValue(Goal goal, BigDecimal requestedAmountPerPeriod) {
+        if (requestedAmountPerPeriod != null) {
+            return requestedAmountPerPeriod;
+        }
+        return goal.getAmountPerPeriod();
     }
 
     @DeleteMapping("/{id}")
@@ -98,6 +106,7 @@ public class GoalController {
         return ResponseEntity.ok(GoalMapper.toTargetHistoryResponse(history));
     }
 
+    @Transactional
     @DeleteMapping("/{id}/target/{historyId}")
     public ResponseEntity<Void> deleteTargetHistory(@PathVariable Long id, @PathVariable Long historyId) {
         goalService.deleteTargetHistory(id, historyId);

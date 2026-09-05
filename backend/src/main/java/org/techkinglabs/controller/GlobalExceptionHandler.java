@@ -5,9 +5,12 @@ import org.slf4j.LoggerFactory;
 import org.techkinglabs.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.server.ResponseStatusException;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
@@ -26,6 +29,30 @@ public class GlobalExceptionHandler {
         log.info("Bad request: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "Bad Request", "message", ex.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
+        Map<String, String> errors = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .collect(Collectors.toMap(
+                        fieldError -> fieldError.getField(),
+                        fieldError -> fieldError.getDefaultMessage()
+                ));
+        log.info("Validation failed: {}", errors);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "Validation Failed", "details", errors));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> handleResponseStatusException(ResponseStatusException ex) {
+        HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+        String errorLabel = status != null ? status.getReasonPhrase() : "Error";
+        String reason = ex.getReason() == null || ex.getReason().isBlank() ? ex.getMessage() : ex.getReason();
+        log.info("{} {}: {}", ex.getStatusCode().value(), errorLabel, reason);
+        return ResponseEntity.status(ex.getStatusCode())
+                .body(Map.of("error", errorLabel, "message", reason != null && !reason.isBlank() ? reason : ""));
     }
 
     @ExceptionHandler(Exception.class)

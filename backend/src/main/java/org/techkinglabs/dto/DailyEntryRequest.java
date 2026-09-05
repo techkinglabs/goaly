@@ -9,8 +9,7 @@ public record DailyEntryRequest(
     @NotNull(message = "Goal ID is required") Long goalId,
     @NotNull(message = "Entry date is required") LocalDate entryDate,
     @NotNull(message = "Actual value is required")
-    @DecimalMin(value = "0.0", inclusive = true, message = "Actual value must not be negative")
+    @DecimalMin(value = "0.0", message = "Actual value must not be negative")
     BigDecimal actualValue,
-    BigDecimal targetValue,
     String note
 ) {}

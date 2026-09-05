@@ -190,7 +190,7 @@ const GoalForm: React.FC<GoalFormProps> = ({
 
       <div className="mb-4">
         <label className="form-label" htmlFor="goal-target-value">
-          {mode === 'create' ? 'Target Value (initial / current) *' : 'Target Value *'}
+          Target Value *
         </label>
         <input
           id="goal-target-value"
@@ -223,23 +223,25 @@ const GoalForm: React.FC<GoalFormProps> = ({
         </select>
       </div>
 
-      <div className="mb-4">
-        <label className="form-label" htmlFor="goal-amount-per-period">
-          Amount per Period
-        </label>
-        <input
-          id="goal-amount-per-period"
-          type="number"
-          step="1"
-          value={values.amountPerPeriod}
-          onChange={(event) => setField('amountPerPeriod', event.target.value)}
-          placeholder="Defaults to Target Value if empty"
-          className="form-input"
-          aria-invalid={Boolean(errors.amountPerPeriod)}
-          aria-describedby={errors.amountPerPeriod ? 'goal-amount-error' : undefined}
-        />
-        <FieldError id="goal-amount-error" message={errors.amountPerPeriod} />
-      </div>
+      {mode === 'edit' ? (
+        <div className="mb-4">
+          <label className="form-label" htmlFor="goal-amount-per-period">
+            Amount per Period
+          </label>
+          <input
+            id="goal-amount-per-period"
+            type="number"
+            step="1"
+            value={values.amountPerPeriod}
+            onChange={(event) => setField('amountPerPeriod', event.target.value)}
+            placeholder="Defaults to Target Value if empty"
+            className="form-input"
+            aria-invalid={Boolean(errors.amountPerPeriod)}
+            aria-describedby={errors.amountPerPeriod ? 'goal-amount-error' : undefined}
+          />
+          <FieldError id="goal-amount-error" message={errors.amountPerPeriod} />
+        </div>
+      ) : null}
 
       <div className="mb-4">
         <label className="flex items-center">

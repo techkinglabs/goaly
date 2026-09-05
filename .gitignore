@@ -18,6 +18,7 @@ backend/target/
 .settings/
 .springBeans
 .sts4-cache
+.scratch/
 
 # OS
 .DS_Store
@@ -42,11 +43,6 @@ DECISIONS.md
 all-tsx*.txt
 all-java.txt
 **/all-java.txt
-nazov.todo.md
-otazky-od-meta.md
-readme2.md
-todo-od-meta*.md
-/gemma-review.md
 /improvements.md
 /review.md
 /todo.md
