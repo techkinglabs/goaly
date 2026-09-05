@@ -16,10 +16,11 @@ public interface TargetHistoryRepository extends JpaRepository<TargetHistory, Lo
 
     Optional<TargetHistory> findFirstByGoalIdAndValidFromLessThanEqualOrderByValidFromDesc(Long goalId, LocalDate date);
 
-    Optional<TargetHistory> findFirstByGoalIdAndValidFromLessThanOrderByValidFromDesc(Long goalId, LocalDate date);
-
-    @Query("select h from TargetHistory h where h.goalId = :goalId and (:excludeId is null or h.id <> :excludeId) and h.validFrom <= :date and (h.validTo is null or h.validTo >= :date) order by h.validFrom desc")
+    @Query("select h from TargetHistory h where h.goalId = :goalId and (:excludeId is null or h.id <> :excludeId) and h.validFrom <= :date and h.validTo is not null and h.validTo >= :date order by h.validFrom desc")
     Optional<TargetHistory> findOverlapping(Long goalId, LocalDate date, Long excludeId);
+
+    @Query("select h from TargetHistory h where h.goalId = :goalId and (:excludeId is null or h.id <> :excludeId) and (:date is null or h.validFrom <= :date) and (:date is null or h.validTo is not null and h.validTo >= :date) order by h.validFrom desc")
+    Optional<TargetHistory> findOverlappingOnDate(Long goalId, LocalDate date, Long excludeId);
 
     @Modifying
     @Query("delete from TargetHistory h where h.goalId = :goalId")

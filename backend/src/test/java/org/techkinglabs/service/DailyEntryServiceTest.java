@@ -1,9 +1,7 @@
 package org.techkinglabs.service;
 
 import org.techkinglabs.entity.DailyEntry;
-import org.techkinglabs.entity.Goal;
 import org.techkinglabs.repository.DailyEntryRepository;
-import org.techkinglabs.repository.GoalRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -16,7 +14,6 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -25,9 +22,6 @@ class DailyEntryServiceTest {
 
     @Mock
     private DailyEntryRepository dailyEntryRepository;
-
-    @Mock
-    private GoalRepository goalRepository;
 
     @Mock
     private GoalService goalService;
@@ -69,15 +63,12 @@ class DailyEntryServiceTest {
         entry.setActualValue(new BigDecimal("5"));
         entry.setTargetValue(new BigDecimal("8"));
 
-        Goal goal = mock(Goal.class);
-        when(goalRepository.findById(entry.getGoalId())).thenReturn(Optional.of(goal));
         when(goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate())).thenReturn(new BigDecimal("12"));
         when(dailyEntryRepository.save(entry)).thenReturn(entry);
 
         DailyEntry result = dailyEntryService.createDailyEntry(entry);
 
         assertEquals(new BigDecimal("12"), result.getTargetValue());
-        verify(goalRepository).findById(entry.getGoalId());
         verify(goalService).getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
         verify(dailyEntryRepository).save(entry);
     }
@@ -94,12 +85,10 @@ class DailyEntryServiceTest {
         moved.setGoalId(1L);
         moved.setEntryDate(LocalDate.of(2026, 1, 1));
 
-        Goal goal = mock(Goal.class);
-        when(goalRepository.findById(moved.getGoalId())).thenReturn(Optional.of(goal));
         when(goalService.getEffectiveTarget(moved.getGoalId(), moved.getEntryDate())).thenReturn(new BigDecimal("9"));
         when(dailyEntryRepository.save(moved)).thenReturn(moved);
 
-        DailyEntry result = dailyEntryService.updateDailyEntryInDb(moved);
+        DailyEntry result = dailyEntryService.updateDailyEntry(moved);
 
         assertEquals(new BigDecimal("9"), result.getTargetValue());
         verify(dailyEntryRepository).save(moved);
@@ -112,12 +101,10 @@ class DailyEntryServiceTest {
         entry.setGoalId(1L);
         entry.setEntryDate(LocalDate.of(2026, 1, 1));
 
-        Goal goal = mock(Goal.class);
-        when(goalRepository.findById(entry.getGoalId())).thenReturn(Optional.of(goal));
         when(goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate())).thenReturn(new BigDecimal("9"));
         when(dailyEntryRepository.save(entry)).thenReturn(entry);
 
-        DailyEntry result = dailyEntryService.updateDailyEntryInDb(entry);
+        DailyEntry result = dailyEntryService.updateDailyEntry(entry);
 
         assertEquals(new BigDecimal("9"), result.getTargetValue());
         verify(dailyEntryRepository).save(entry);

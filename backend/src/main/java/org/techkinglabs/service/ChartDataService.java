@@ -6,7 +6,6 @@ import org.techkinglabs.entity.Goal;
 import org.techkinglabs.entity.TargetHistory;
 import org.techkinglabs.model.Period;
 import org.techkinglabs.repository.GoalRepository;
-import org.techkinglabs.repository.TargetHistoryRepository;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -21,18 +20,15 @@ public class ChartDataService {
     private final DailyEntryService dailyEntryService;
     private final GoalRepository goalRepository;
     private final GoalService goalService;
-    private final TargetHistoryRepository targetHistoryRepository;
     private final Clock clock;
 
     public ChartDataService(DailyEntryService dailyEntryService,
                             GoalRepository goalRepository,
                             GoalService goalService,
-                            TargetHistoryRepository targetHistoryRepository,
                             Clock clock) {
         this.dailyEntryService = dailyEntryService;
         this.goalRepository = goalRepository;
         this.goalService = goalService;
-        this.targetHistoryRepository = targetHistoryRepository;
         this.clock = clock;
     }
 
@@ -60,8 +56,7 @@ public class ChartDataService {
         LocalDate anchorDate = anchor != null ? anchor : today;
         LocalDate to = anchorDate.isAfter(today) ? today : anchorDate;
         LocalDate rawFrom = resolveFrom(range, anchorDate);
-        LocalDate from = (rawFrom != null && rawFrom.isAfter(today)) ? today : rawFrom;
-        final LocalDate windowFrom = from;
+        final LocalDate windowFrom = (rawFrom != null && rawFrom.isAfter(today)) ? today : rawFrom;
         final LocalDate windowTo = to;
 
         Map<Long, Period> goalPeriods = new HashMap<>();
@@ -83,13 +78,13 @@ public class ChartDataService {
                 LocalDate bucket = startOfWeek(windowFrom);
                 while (!bucket.isAfter(windowTo)) {
                     ensureBucket(bucket, groupedData, goalIds, goalPeriods, historyByGoal,
-                            runningActual, runningTarget, countedPeriods, today, weekly);
+                            runningActual, runningTarget, countedPeriods, today);
                     bucket = bucket.plusWeeks(1);
                 }
             } else {
                 for (LocalDate day = windowFrom; !day.isAfter(windowTo); day = day.plusDays(1)) {
                     ensureBucket(day, groupedData, goalIds, goalPeriods, historyByGoal,
-                            runningActual, runningTarget, countedPeriods, today, weekly);
+                            runningActual, runningTarget, countedPeriods, today);
                 }
             }
         }
@@ -100,6 +95,12 @@ public class ChartDataService {
                 .sorted(Comparator.comparing(DailyEntry::getEntryDate))
                 .toList();
 
+        seriesAccumulator(historyByGoal, filtered, weekly, groupedData, runningActual, goalPeriods, runningTarget, countedPeriods, today);
+
+        return new ArrayList<>(groupedData.values());
+    }
+
+    private void seriesAccumulator(Map<Long, List<TargetHistory>> historyByGoal, List<DailyEntry> filtered, boolean weekly, Map<LocalDate, ChartDataPoint> groupedData, Map<Long, BigDecimal> runningActual, Map<Long, Period> goalPeriods, Map<Long, BigDecimal> runningTarget, Map<Long, Set<LocalDate>> countedPeriods, LocalDate today) {
         for (DailyEntry entry : filtered) {
             LocalDate bucket = weekly ? startOfWeek(entry.getEntryDate()) : entry.getEntryDate();
             groupedData.putIfAbsent(bucket, new ChartDataPoint(bucket.toString(),
@@ -126,8 +127,6 @@ public class ChartDataService {
                     goalsMap, totalsMap, targetsMap
             ));
         }
-
-        return new ArrayList<>(groupedData.values());
     }
 
     private LocalDate periodStartFor(Long goalId, Map<Long, Period> goalPeriods, LocalDate date) {
@@ -145,7 +144,7 @@ public class ChartDataService {
                                     Map<Long, Set<LocalDate>> countedPeriods, LocalDate today,
                                     Map<Long, List<TargetHistory>> historyByGoal) {
         if (!periodStart.isAfter(today)) {
-            Set<LocalDate> counted = countedPeriods.computeIfAbsent(goalId, k -> new HashSet<>());
+            Set<LocalDate> counted = countedPeriods.computeIfAbsent(goalId, _ -> new HashSet<>());
             if (counted.add(periodStart)) {
                 BigDecimal target = getEffectiveTargetFromHistory(goalId, periodStart, historyByGoal);
                 runningTarget.merge(goalId, target, BigDecimal::add);
@@ -188,7 +187,7 @@ public class ChartDataService {
                               List<Long> goalIds, Map<Long, Period> goalPeriods,
                               Map<Long, List<TargetHistory>> historyByGoal,
                               Map<Long, BigDecimal> runningActual, Map<Long, BigDecimal> runningTarget,
-                              Map<Long, Set<LocalDate>> countedPeriods, LocalDate today, boolean weekly) {
+                              Map<Long, Set<LocalDate>> countedPeriods, LocalDate today) {
         groupedData.putIfAbsent(bucket, new ChartDataPoint(bucket.toString(),
                 new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>()));
         ChartDataPoint point = groupedData.get(bucket);

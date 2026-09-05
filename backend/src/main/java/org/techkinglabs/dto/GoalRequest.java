@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.techkinglabs.model.Period;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 
 public record GoalRequest(
     @NotBlank(message = "Name is required") String name,
@@ -16,9 +15,6 @@ public record GoalRequest(
     Boolean isActive,
     String description,
     Period period,
-    @DecimalMin(value = "0.0", inclusive = true, message = "Amount per period must not be negative")
-    BigDecimal amountPerPeriod,
-    LocalDate initialTargetDate,
-    @DecimalMin(value = "0.0", inclusive = true, message = "Initial target value must not be negative")
-    BigDecimal initialTargetValue
+    @DecimalMin(value = "0.0", message = "Amount per period must not be negative")
+    BigDecimal amountPerPeriod
 ) {}

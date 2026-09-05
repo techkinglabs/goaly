@@ -55,7 +55,7 @@ public class DailyEntryController {
         DailyEntry entry = dailyEntryService.getEntryById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Entry not found with id: " + id));
         DailyEntryMapper.updateEntityFromRequest(request, entry);
-        DailyEntry updatedEntry = dailyEntryService.updateDailyEntryInDb(entry);
+        DailyEntry updatedEntry = dailyEntryService.updateDailyEntry(entry);
         return ResponseEntity.ok(DailyEntryMapper.toResponse(updatedEntry));
     }
 

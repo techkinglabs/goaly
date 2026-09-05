@@ -3,6 +3,7 @@ package org.techkinglabs.mapper;
 import org.techkinglabs.dto.DailyEntryResponse;
 import org.techkinglabs.dto.DailyEntryRequest;
 import org.techkinglabs.entity.DailyEntry;
+import java.math.BigDecimal;
 
 public class DailyEntryMapper {
     public static DailyEntryResponse toResponse(DailyEntry entry) {
@@ -23,7 +24,8 @@ public class DailyEntryMapper {
         entry.setGoalId(request.goalId());
         entry.setEntryDate(request.entryDate());
         entry.setActualValue(request.actualValue());
-        entry.setTargetValue(request.targetValue());
+        // targetValue is server-derived from the effective target history, never a client input.
+        entry.setTargetValue(BigDecimal.ZERO);
         entry.setNote(request.note());
         return entry;
     }
@@ -33,7 +35,7 @@ public class DailyEntryMapper {
         entry.setGoalId(request.goalId());
         entry.setEntryDate(request.entryDate());
         entry.setActualValue(request.actualValue());
-        entry.setTargetValue(request.targetValue());
         entry.setNote(request.note());
+        // targetValue is intentionally not applied here so that the service re-derives it.
     }
 }

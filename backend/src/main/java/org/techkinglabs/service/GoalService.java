@@ -10,6 +10,7 @@ import org.techkinglabs.repository.TargetHistoryRepository;
 import org.techkinglabs.repository.DailyEntryRepository;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -25,10 +26,13 @@ public class GoalService {
 
     private final DailyEntryRepository dailyEntryRepository;
 
-    public GoalService(GoalRepository goalRepository, TargetHistoryRepository targetHistoryRepository, DailyEntryRepository dailyEntryRepository) {
+    private final Clock clock;
+
+    public GoalService(GoalRepository goalRepository, TargetHistoryRepository targetHistoryRepository, DailyEntryRepository dailyEntryRepository, Clock clock) {
         this.goalRepository = goalRepository;
         this.targetHistoryRepository = targetHistoryRepository;
         this.dailyEntryRepository = dailyEntryRepository;
+        this.clock = clock;
     }
 
     public List<Goal> getGoals(Boolean active) {
@@ -52,7 +56,7 @@ public class GoalService {
 
         TargetHistory history = new TargetHistory();
         history.setGoalId(saved.getId());
-        history.setValidFrom(LocalDate.now());
+        history.setValidFrom(LocalDate.now(clock));
         history.setValue(seedValue);
         history.setPeriod(saved.getPeriod());
         targetHistoryRepository.save(history);
@@ -61,8 +65,31 @@ public class GoalService {
         return goalRepository.save(saved);
     }
 
-    public Goal updateGoal(Goal goal) {
-        return goalRepository.save(goal);
+    @Transactional
+    public Goal updateGoal(Goal goal, BigDecimal effectiveSeedValue) {
+        Goal saved = goalRepository.save(goal);
+        LocalDate today = LocalDate.now(clock);
+        TargetHistory current = targetHistoryRepository
+                .findFirstByGoalIdAndValidFromLessThanEqualOrderByValidFromDesc(goal.getId(), today)
+                .orElse(null);
+        if (current != null && effectiveSeedValue.compareTo(current.getValue()) == 0) {
+            return saved;
+        }
+        TargetHistory overlapping = targetHistoryRepository
+                .findOverlappingOnDate(goal.getId(), today, current != null ? current.getId() : null)
+                .orElse(null);
+        if (overlapping != null) {
+            throw new IllegalArgumentException("Target history overlaps on date " + today + " for goal " + goal.getId());
+        }
+        TargetHistory newHistory = new TargetHistory();
+        newHistory.setGoalId(goal.getId());
+        newHistory.setValidFrom(today);
+        newHistory.setValue(effectiveSeedValue);
+        newHistory.setPeriod(goal.getPeriod() != null ? goal.getPeriod() : (current != null ? current.getPeriod() : null));
+        targetHistoryRepository.save(newHistory);
+        saved.setTargetValue(effectiveSeedValue);
+        saved.setAmountPerPeriod(effectiveSeedValue);
+        return goalRepository.save(saved);
     }
 
     @Transactional
@@ -107,7 +134,7 @@ public class GoalService {
                 history.setValidTo(validTo);
             }
             TargetHistory overlapping = targetHistoryRepository
-                    .findOverlapping(goalId, validTo, history.getId())
+                    .findOverlappingOnDate(goalId, validTo, history.getId())
                     .orElse(null);
             if (overlapping != null) {
                 throw new IllegalArgumentException("validTo " + validTo + " overlaps an existing target history on goal " + goalId);
@@ -125,20 +152,18 @@ public class GoalService {
             history.setValidTo(validTo);
             history.setValue(value);
             history.setPeriod(period);
-            if (validTo != null) {
-                TargetHistory next = targetHistoryRepository
-                        .findFirstByGoalIdAndValidFromGreaterThanOrderByValidFromAsc(goalId, validFrom)
-                        .orElse(null);
-                if (next != null && !validTo.isBefore(next.getValidFrom())) {
-                    throw new IllegalArgumentException("validTo " + validTo + " overlaps with target history starting on " + next.getValidFrom());
-                }
+            TargetHistory next = targetHistoryRepository
+                    .findFirstByGoalIdAndValidFromGreaterThanOrderByValidFromAsc(goalId, validFrom)
+                    .orElse(null);
+            if (next != null && validTo != null && !validTo.isBefore(next.getValidFrom())) {
+                throw new IllegalArgumentException("validTo " + validTo + " overlaps with target history starting on " + next.getValidFrom());
             }
         }
         TargetHistory saved = targetHistoryRepository.save(history);
 
         relinkTargetHistory(goalId);
 
-        if (validFrom != null && !validFrom.isAfter(LocalDate.now())) {
+        if (validFrom != null && !validFrom.isAfter(LocalDate.now(clock))) {
             applyEffectiveTarget(goal, value, period);
         }
 
@@ -161,13 +186,11 @@ public class GoalService {
         if (overlapping != null) {
             throw new IllegalArgumentException("validFrom " + validFrom + " overlaps an existing target history on goal " + goalId);
         }
-        if (validTo != null) {
-            TargetHistory next = targetHistoryRepository
-                    .findFirstByGoalIdAndValidFromGreaterThanOrderByValidFromAsc(goalId, validFrom)
-                    .orElse(null);
-            if (next != null && !validTo.isBefore(next.getValidFrom())) {
-                throw new IllegalArgumentException("validTo " + validTo + " overlaps with target history starting on " + next.getValidFrom());
-            }
+        TargetHistory next = targetHistoryRepository
+                .findFirstByGoalIdAndValidFromGreaterThanOrderByValidFromAsc(goalId, validFrom)
+                .orElse(null);
+        if (next != null && validTo != null && !validTo.isBefore(next.getValidFrom())) {
+            throw new IllegalArgumentException("validTo " + validTo + " overlaps with target history starting on " + next.getValidFrom());
         }
         history.setValidFrom(validFrom);
         history.setValidTo(validTo);
@@ -175,6 +198,14 @@ public class GoalService {
         history.setPeriod(period);
         TargetHistory saved = targetHistoryRepository.save(history);
         relinkTargetHistory(goalId);
+        TargetHistory effectiveToday = targetHistoryRepository
+                .findFirstByGoalIdAndValidFromLessThanEqualOrderByValidFromDesc(goalId, LocalDate.now(clock))
+                .orElse(null);
+        if (effectiveToday != null && effectiveToday.getId().equals(saved.getId())) {
+            Goal goal = goalRepository.findById(goalId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + goalId));
+            applyEffectiveTarget(goal, saved.getValue(), saved.getPeriod());
+        }
         return targetHistoryRepository.findById(saved.getId()).orElse(saved);
     }
 
@@ -205,6 +236,7 @@ public class GoalService {
                 .orElse(BigDecimal.ZERO);
     }
 
+    @Transactional
     public void deleteTargetHistory(Long id, Long historyId) {
         TargetHistory history = targetHistoryRepository.findById(historyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Target history not found with id: " + historyId));
@@ -213,5 +245,16 @@ public class GoalService {
         }
         targetHistoryRepository.delete(history);
         this.relinkTargetHistory(id);
+
+        Goal goal = goalRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
+        TargetHistory effectiveToday = targetHistoryRepository
+                .findFirstByGoalIdAndValidFromLessThanEqualOrderByValidFromDesc(id, LocalDate.now(clock))
+                .orElse(null);
+        if (effectiveToday != null) {
+            applyEffectiveTarget(goal, effectiveToday.getValue(), effectiveToday.getPeriod());
+        } else {
+            applyEffectiveTarget(goal, BigDecimal.ZERO, goal.getPeriod());
+        }
     }
 }
