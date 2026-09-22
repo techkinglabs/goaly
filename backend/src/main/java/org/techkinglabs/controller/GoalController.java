@@ -3,17 +3,16 @@ package org.techkinglabs.controller;
 import jakarta.validation.Valid;
 import org.techkinglabs.dto.GoalRequest;
 import org.techkinglabs.dto.GoalResponse;
+import org.techkinglabs.dto.TargetHistoryRequest;
 import org.techkinglabs.dto.TargetHistoryResponse;
 import org.techkinglabs.entity.Goal;
 import org.techkinglabs.entity.TargetHistory;
 import org.techkinglabs.exception.ResourceNotFoundException;
 import org.techkinglabs.mapper.GoalMapper;
-import org.techkinglabs.model.Period;
 import org.techkinglabs.service.GoalService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -76,12 +75,8 @@ public class GoalController {
     @PostMapping("/{id}/target")
     public ResponseEntity<TargetHistoryResponse> addTargetHistory(
             @PathVariable Long id,
-            @RequestParam LocalDate validFrom,
-            @RequestParam(required = false) LocalDate validTo,
-            @RequestParam BigDecimal value,
-            @RequestParam(required = false, defaultValue = "WEEK") String period) {
-        Period parsedPeriod = Period.fromValue(period);
-        TargetHistory history = goalService.addTargetHistory(id, validFrom, validTo, value, parsedPeriod);
+            @Valid @RequestBody TargetHistoryRequest targetHistoryRequest)  {
+        TargetHistory history = goalService.addTargetHistory(id, targetHistoryRequest.validFrom(), targetHistoryRequest.validTo(), targetHistoryRequest.value(), targetHistoryRequest.period());
         return ResponseEntity.status(201).body(GoalMapper.toTargetHistoryResponse(history));
     }
 
@@ -96,12 +91,8 @@ public class GoalController {
     public ResponseEntity<TargetHistoryResponse> updateTargetHistory(
             @PathVariable Long id,
             @PathVariable Long historyId,
-            @RequestParam LocalDate validFrom,
-            @RequestParam(required = false) LocalDate validTo,
-            @RequestParam BigDecimal value,
-            @RequestParam(required = false, defaultValue = "WEEK") String period) {
-        Period parsedPeriod = Period.fromValue(period);
-        TargetHistory history = goalService.updateTargetHistory(id, historyId, validFrom, validTo, value, parsedPeriod);
+            @Valid @RequestBody TargetHistoryRequest targetHistoryRequest) {
+        TargetHistory history = goalService.updateTargetHistory(id, historyId,targetHistoryRequest.validFrom() , targetHistoryRequest.validTo(), targetHistoryRequest.value(), targetHistoryRequest.period());
         return ResponseEntity.ok(GoalMapper.toTargetHistoryResponse(history));
     }
 

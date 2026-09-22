@@ -7,7 +7,10 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import org.junit.jupiter.api.Test;
 import org.springframework.format.support.DefaultFormattingConversionService;
 import org.springframework.http.converter.json.JacksonJsonHttpMessageConverter;
@@ -74,7 +77,8 @@ class ChartControllerIntegrationTest {
     private MockMvc buildMockMvc() {
         org.techkinglabs.repository.GoalRepository goalRepository =
                 mock(org.techkinglabs.repository.GoalRepository.class);
-        ChartController controller = new ChartController(chartDataService, goalRepository);
+        Clock clock = Clock.system(ZoneId.of("UTC"));
+        ChartController controller = new ChartController(chartDataService, goalRepository, clock);
 
         return MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())

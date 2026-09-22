@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+@SuppressWarnings("unused")
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -40,7 +41,9 @@ public class GlobalExceptionHandler {
                 .stream()
                 .collect(Collectors.toMap(
                         FieldError::getField,
-                        error -> Objects.requireNonNullElse(error.getDefaultMessage(), "")));
+                        error -> Objects.requireNonNullElse(error.getDefaultMessage(), ""),
+                        (a, b) -> a + ", " + b
+                ));
         log.info("Validation failed: {}", errors);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", "Validation Failed", "details", errors));
@@ -55,7 +58,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatusCode())
                 .body(Map.of("error", errorLabel, "message", reason != null && !reason.isBlank() ? reason : ""));
     }
-
+    @SuppressWarnings("unused")
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
         log.error("Unhandled exception", ex);

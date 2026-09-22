@@ -1,6 +1,7 @@
 package org.techkinglabs.service;
 
 import org.techkinglabs.entity.DailyEntry;
+import org.techkinglabs.entity.Goal;
 import org.techkinglabs.repository.DailyEntryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -64,6 +66,7 @@ class DailyEntryServiceTest {
         entry.setTargetValue(new BigDecimal("8"));
 
         when(goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate())).thenReturn(new BigDecimal("12"));
+        when(goalService.getGoalById(1L)).thenReturn(Optional.of(new Goal(1L, null, null, null, null, null, true, "desc")));
         when(dailyEntryRepository.save(entry)).thenReturn(entry);
 
         DailyEntry result = dailyEntryService.createDailyEntry(entry);
@@ -85,6 +88,7 @@ class DailyEntryServiceTest {
         moved.setGoalId(1L);
         moved.setEntryDate(LocalDate.of(2026, 1, 1));
 
+        when(goalService.getGoalById(moved.getGoalId())).thenReturn(Optional.of(new Goal(1L, null, null, null, null, null, true, "desc")));
         when(goalService.getEffectiveTarget(moved.getGoalId(), moved.getEntryDate())).thenReturn(new BigDecimal("9"));
         when(dailyEntryRepository.save(moved)).thenReturn(moved);
 
@@ -101,6 +105,7 @@ class DailyEntryServiceTest {
         entry.setGoalId(1L);
         entry.setEntryDate(LocalDate.of(2026, 1, 1));
 
+        when(goalService.getGoalById(entry.getGoalId())).thenReturn(Optional.of(new Goal(1L, null, null, null, null, null, true, "desc")));
         when(goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate())).thenReturn(new BigDecimal("9"));
         when(dailyEntryRepository.save(entry)).thenReturn(entry);
 

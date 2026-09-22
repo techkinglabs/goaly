@@ -48,21 +48,22 @@ public class GoalService {
 
     @Transactional
     public Goal createGoal(Goal goal) {
-        Goal saved = goalRepository.save(goal);
-
         BigDecimal seedValue = Optional.ofNullable(goal.getAmountPerPeriod())
                 .or(() -> Optional.ofNullable(goal.getTargetValue()))
                 .orElse(BigDecimal.ZERO);
+
+        goal.setAmountPerPeriod(seedValue);
+        goal.setTargetValue(seedValue);
+        Goal saved = goalRepository.save(goal);
 
         TargetHistory history = new TargetHistory();
         history.setGoalId(saved.getId());
         history.setValidFrom(LocalDate.now(clock));
         history.setValue(seedValue);
-        history.setPeriod(saved.getPeriod());
+        history.setPeriod(saved.getPeriod()!= null? saved.getPeriod() : Period.WEEK);
         targetHistoryRepository.save(history);
 
-        saved.setTargetValue(seedValue);
-        return goalRepository.save(saved);
+        return saved;
     }
 
     @Transactional

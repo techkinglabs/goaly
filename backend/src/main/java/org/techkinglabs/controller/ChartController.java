@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
@@ -24,10 +26,12 @@ public class ChartController {
 
     private final ChartDataService chartDataService;
     private final GoalRepository goalRepository;
+    private final Clock clock;
 
-    public ChartController(ChartDataService chartDataService, GoalRepository goalRepository) {
+    public ChartController(ChartDataService chartDataService, GoalRepository goalRepository, Clock clock) {
         this.chartDataService = chartDataService;
         this.goalRepository = goalRepository;
+        this.clock=clock;
     }
 
     @GetMapping("/data")
@@ -39,7 +43,7 @@ public class ChartController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Invalid range '" + range + "'. Allowed: 7d, 30d, 365d, week, year, all");
         }
-        if (anchor != null && anchor.isAfter(LocalDate.now())) {
+        if (anchor != null && anchor.isAfter(LocalDate.now(clock))) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "anchor must not be in the future");
         }

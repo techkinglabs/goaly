@@ -46,7 +46,9 @@ public class DailyEntryService {
         if (entry.getEntryDate().isAfter(LocalDate.now(clock))) {
             throw new IllegalArgumentException("Entry date must not be in the future");
         }
-
+        if (goalService.getGoalById(entry.getGoalId()).isEmpty()) {
+            throw new ResourceNotFoundException("Goal not found with id: " + entry.getGoalId());
+        }
         BigDecimal effectiveTarget = goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
         entry.setTargetValue(effectiveTarget);
 
@@ -56,6 +58,9 @@ public class DailyEntryService {
     public DailyEntry updateDailyEntry(DailyEntry entry) {
         if (entry.getEntryDate().isAfter(LocalDate.now(clock))) {
             throw new IllegalArgumentException("Entry date must not be in the future");
+        }
+        if (goalService.getGoalById(entry.getGoalId()).isEmpty()) {
+            throw new ResourceNotFoundException("Goal not found with id: " + entry.getGoalId());
         }
         BigDecimal effectiveTarget = goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
         entry.setTargetValue(effectiveTarget);

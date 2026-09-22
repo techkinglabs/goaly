@@ -8,6 +8,8 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.CorsRegistration;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.util.Arrays;
+
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
@@ -22,7 +24,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .maxAge(3600);
 
-        if (allowedOrigins != null && allowedOrigins.length > 0 && !allowedOrigins[0].isBlank()) {
+        if (Arrays.stream(allowedOrigins).anyMatch(o -> o!= null &&!o.isBlank() &&!o.trim().isEmpty())) {
             registration.allowedOrigins(allowedOrigins);
             registration.allowCredentials(true);
         } else {

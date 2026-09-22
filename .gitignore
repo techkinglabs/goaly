@@ -37,12 +37,9 @@ backend/target/
 # build artifacts
 temp_build/
 node_modules/
-# AI working files - do not commit
+# working files - do not commit
 COMMITS.md
 DECISIONS.md
-all-tsx*.txt
-all-java.txt
-**/all-java.txt
 /improvements.md
 /review.md
 /todo.md
