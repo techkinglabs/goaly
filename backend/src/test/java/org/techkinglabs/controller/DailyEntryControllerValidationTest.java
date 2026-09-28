@@ -33,6 +33,7 @@ class DailyEntryControllerValidationTest {
     void setUp() {
         dailyEntryService = mock(DailyEntryService.class);
         DailyEntryController controller = new DailyEntryController(dailyEntryService);
+
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .setMessageConverters(new JacksonJsonHttpMessageConverter())
@@ -40,16 +41,11 @@ class DailyEntryControllerValidationTest {
     }
 
     @Test
-    void validRequestShouldReturn201Created() throws Exception {
-        DailyEntry dailyEntry = new DailyEntry();
-        dailyEntry.setId(1L);
-        dailyEntry.setGoalId(1L);
-        dailyEntry.setTargetValue(BigDecimal.ONE);
-        dailyEntry.setNote("note");
-        dailyEntry.setActualValue(BigDecimal.ONE);
-        dailyEntry.setEntryDate(LocalDate.of(2026, 9, 23));
+    void createDailyEntryShouldReturn201Created() throws Exception {
+        DailyEntry dailyEntry = createDailyEntry();
 
-        when(dailyEntryService.createDailyEntry(any(DailyEntry.class))).thenReturn(dailyEntry);
+        when(dailyEntryService.createDailyEntry(any(DailyEntry.class)))
+                .thenReturn(dailyEntry);
 
         String validJson = """
                 {
@@ -66,21 +62,25 @@ class DailyEntryControllerValidationTest {
                 .andExpect(jsonPath("$.entryDate").value("2026-09-23"))
                 .andExpect(jsonPath("$.actualValue").value(1))
                 .andReturn();
-        verify(dailyEntryService).createDailyEntry(argThat(e -> e.getActualValue().equals(BigDecimal.ONE)));
+
+        verify(dailyEntryService)
+                .createDailyEntry(argThat(e ->
+                        e.getActualValue().equals(BigDecimal.ONE)));
+
         assertThat(result.getResponse().getStatus()).isEqualTo(201);
     }
 
     @Test
-    void dailyEntryRequestShouldReturn404() throws Exception {
-        Optional<DailyEntry> dailyEntry = Optional.empty();
-        when(dailyEntryService.getEntryById(anyLong())).thenReturn(dailyEntry);
+    void getDailyEntryShouldReturn404WhenNotFound() throws Exception {
+        when(dailyEntryService.getEntryById(anyLong()))
+                .thenReturn(Optional.empty());
 
-        mockMvc.perform(get("/api/entries/20")
-                ).andExpect(status().isNotFound()).andReturn();
+        mockMvc.perform(get("/api/entries/20"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    void requestShouldReturn400() throws Exception {
+    void createDailyEntryShouldReturn400ForInvalidRequest() throws Exception {
         MvcResult result = mockMvc.perform(post("/api/entries")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
@@ -90,16 +90,58 @@ class DailyEntryControllerValidationTest {
     }
 
     @Test
-    void getDailyEntryRequestById() throws Exception {
-        DailyEntry dailyEntry = new DailyEntry();
-        dailyEntry.setId(1L);
-        dailyEntry.setGoalId(1L);
-        dailyEntry.setTargetValue(BigDecimal.ONE);
-        dailyEntry.setNote("note");
-        dailyEntry.setActualValue(BigDecimal.ONE);
-        dailyEntry.setEntryDate(LocalDate.of(2026, 9, 23));
+    void createDailyEntryShouldReturn404WhenGoalDoesNotExist() throws Exception {
+        when(dailyEntryService.createDailyEntry(any(DailyEntry.class)))
+                .thenThrow(new ResourceNotFoundException("Goal not found"));
 
-        when(dailyEntryService.getEntryById(1L)).thenReturn(Optional.of(dailyEntry));
+        String json = """
+                {
+                    "goalId": 20,
+                    "entryDate": "2026-09-28",
+                    "actualValue": 10
+                }
+                """;
+
+        mockMvc.perform(post("/api/entries")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isNotFound());
+
+        verify(dailyEntryService)
+                .createDailyEntry(any(DailyEntry.class));
+    }
+
+    @Test
+    void updateDailyEntryShouldReturn404WhenGoalDoesNotExist() throws Exception {
+        DailyEntry dailyEntry = createDailyEntry();
+
+        when(dailyEntryService.getEntryById(1L))
+                .thenReturn(Optional.of(dailyEntry));
+
+        when(dailyEntryService.updateDailyEntry(any(DailyEntry.class)))
+                .thenThrow(new ResourceNotFoundException("Goal not found"));
+
+        String json = """
+                {
+                    "goalId": 20,
+                    "actualValue": 10,
+                    "note": "updated note",
+                    "entryDate": "2026-09-23"
+                }
+                """;
+
+        mockMvc.perform(put("/api/entries/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getDailyEntryShouldReturn200WhenFound() throws Exception {
+        DailyEntry dailyEntry = createDailyEntry();
+
+        when(dailyEntryService.getEntryById(1L))
+                .thenReturn(Optional.of(dailyEntry));
 
         mockMvc.perform(get("/api/entries/1"))
                 .andExpect(status().isOk())
@@ -111,20 +153,16 @@ class DailyEntryControllerValidationTest {
     }
 
     @Test
-    void getAllRequest() throws Exception {
-        DailyEntry entry1 = new DailyEntry();
-        entry1.setId(1L);
-        entry1.setGoalId(1L);
-        entry1.setActualValue(BigDecimal.ONE);
-        entry1.setEntryDate(LocalDate.of(2026, 9, 23));
+    void getAllDailyEntriesShouldReturn200() throws Exception {
+        DailyEntry entry1 = createDailyEntry();
 
-        DailyEntry entry2 = new DailyEntry();
+        DailyEntry entry2 = createDailyEntry();
         entry2.setId(2L);
-        entry2.setGoalId(1L);
         entry2.setActualValue(BigDecimal.TEN);
         entry2.setEntryDate(LocalDate.of(2026, 9, 22));
 
-        when(dailyEntryService.getAllEntries()).thenReturn(List.of(entry1, entry2));
+        when(dailyEntryService.getAllEntries())
+                .thenReturn(List.of(entry1, entry2));
 
         mockMvc.perform(get("/api/entries"))
                 .andExpect(status().isOk())
@@ -136,33 +174,27 @@ class DailyEntryControllerValidationTest {
     }
 
     @Test
-    void updateRequest() throws Exception {
-        DailyEntry existingEntry = new DailyEntry();
-        existingEntry.setId(1L);
-        existingEntry.setGoalId(1L);
-        existingEntry.setEntryDate(LocalDate.of(2026, 9, 23));
-        existingEntry.setActualValue(BigDecimal.ONE);
+    void updateDailyEntryShouldReturn200() throws Exception {
+        DailyEntry existingEntry = createDailyEntry();
 
-        when(dailyEntryService.getEntryById(1L)).thenReturn(Optional.of(existingEntry));
+        when(dailyEntryService.getEntryById(1L))
+                .thenReturn(Optional.of(existingEntry));
 
-        DailyEntry updatedEntry = new DailyEntry();
-        updatedEntry.setId(1L);
-        updatedEntry.setGoalId(1L);
-        updatedEntry.setNote("updated note");
+        DailyEntry updatedEntry = createDailyEntry();
         updatedEntry.setActualValue(BigDecimal.TEN);
-        updatedEntry.setTargetValue(BigDecimal.ONE);
-        updatedEntry.setEntryDate(LocalDate.of(2026, 9, 23));
+        updatedEntry.setNote("updated note");
 
-        when(dailyEntryService.updateDailyEntry(any(DailyEntry.class))).thenReturn(updatedEntry);
+        when(dailyEntryService.updateDailyEntry(any(DailyEntry.class)))
+                .thenReturn(updatedEntry);
 
         String updateJson = """
-            {
-                "goalId": 1,
-                "actualValue": 10,
-                "note": "updated note",
-                "entryDate": "2026-09-23"
-            }
-            """;
+                {
+                    "goalId": 1,
+                    "actualValue": 10,
+                    "note": "updated note",
+                    "entryDate": "2026-09-23"
+                }
+                """;
 
         mockMvc.perform(put("/api/entries/1")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -195,5 +227,16 @@ class DailyEntryControllerValidationTest {
                 .andExpect(status().isNotFound());
 
         verify(dailyEntryService).deleteDailyEntry(999L);
+    }
+
+    private DailyEntry createDailyEntry() {
+        DailyEntry dailyEntry = new DailyEntry();
+        dailyEntry.setId(1L);
+        dailyEntry.setGoalId(1L);
+        dailyEntry.setTargetValue(BigDecimal.ONE);
+        dailyEntry.setNote("note");
+        dailyEntry.setActualValue(BigDecimal.ONE);
+        dailyEntry.setEntryDate(LocalDate.of(2026, 9, 23));
+        return dailyEntry;
     }
 }

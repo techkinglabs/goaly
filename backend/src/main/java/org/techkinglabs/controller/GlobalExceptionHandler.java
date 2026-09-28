@@ -2,6 +2,7 @@ package org.techkinglabs.controller;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.validation.FieldError;
 import org.techkinglabs.exception.ResourceNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -65,5 +66,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of("error", "Internal Server Error",
                         "message", "An unexpected error occurred"));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(
+            DataIntegrityViolationException ex) {
+
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of(
+                        "error", "Conflict",
+                        "message", "The requested operation conflicts with existing data"
+                ));
     }
 }
