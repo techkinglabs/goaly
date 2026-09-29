@@ -39,7 +39,7 @@ public class GoalService {
         if (active == null) {
             return goalRepository.findAll();
         }
-        return active ? goalRepository.findByIsActiveTrue() : goalRepository.findByIsActiveFalse();
+        return active ? goalRepository.findByActiveTrue() : goalRepository.findByActiveFalse();
     }
 
     public Optional<Goal> getGoalById(Long id) {

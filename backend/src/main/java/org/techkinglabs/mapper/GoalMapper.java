@@ -23,7 +23,7 @@ public class GoalMapper {
             goal.getName(),
             goal.getUnit(),
             goal.getTargetValue(),
-            goal.getIsActive(),
+            goal.isActive(),
             goal.getDescription(),
             goal.getPeriod(),
             goal.getAmountPerPeriod(),
@@ -49,7 +49,7 @@ public class GoalMapper {
         goal.setName(request.name());
         goal.setUnit(request.unit());
         goal.setTargetValue(request.targetValue());
-        goal.setIsActive(request.isActive() != null ? request.isActive() : true);
+        goal.setActive(request.active() != null ? request.active() : true);
         goal.setDescription(request.description());
         goal.setPeriod(request.period() != null ? request.period() : Period.WEEK);
         // Keep the client value verbatim (null = "unspecified"); GoalService.createGoal
@@ -66,7 +66,9 @@ public class GoalMapper {
         goal.setUnit(request.unit());
         goal.setTargetValue(request.targetValue());
         goal.setAmountPerPeriod(request.amountPerPeriod());
-        goal.setIsActive(request.isActive() != null ? request.isActive() : goal.getIsActive());
+        if (request.active() != null) {
+            goal.setActive(request.active());
+        }
         goal.setDescription(request.description());
         if (request.period() != null) {
             goal.setPeriod(request.period());

@@ -8,7 +8,7 @@ import java.util.List;
 
 @Repository
 public interface GoalRepository extends JpaRepository<Goal, Long> {
-    List<Goal> findByIsActiveTrue();
+    List<Goal> findByActiveTrue();
 
-    List<Goal> findByIsActiveFalse();
+    List<Goal> findByActiveFalse();
 }

@@ -26,7 +26,7 @@ function buildInitialValues(goal?: Goal): GoalFormValues {
       targetValue: '',
       amountPerPeriod: '',
       period: 'WEEK',
-      isActive: true,
+      active: true,
       description: '',
     };
   }
@@ -41,7 +41,7 @@ function buildInitialValues(goal?: Goal): GoalFormValues {
     targetValue: String(goal.targetValue ?? ''),
     amountPerPeriod: String(goal.amountPerPeriod ?? goal.targetValue ?? ''),
     period: goal.period ?? 'WEEK',
-    isActive: goal.isActive,
+    active: goal.active,
     description: goal.description ?? '',
   };
 }
@@ -104,7 +104,7 @@ const GoalForm: React.FC<GoalFormProps> = ({
         name: result.data.name,
         unit: result.data.unit,
         targetValue: result.data.targetValue,
-        isActive: result.data.isActive,
+        active: result.data.active,
         description: result.data.description,
         period: result.data.period,
         amountPerPeriod: result.data.amountPerPeriod,
@@ -247,8 +247,8 @@ const GoalForm: React.FC<GoalFormProps> = ({
         <label className="flex items-center">
           <input
             type="checkbox"
-            checked={values.isActive}
-            onChange={(event) => setField('isActive', event.target.checked)}
+            checked={values.active}
+            onChange={(event) => setField('active', event.target.checked)}
             className="mr-2 rounded accent-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]"
           />
           <span className="text-sm text-[var(--text-secondary)]">Active Goal</span>

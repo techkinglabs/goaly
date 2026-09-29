@@ -37,9 +37,9 @@ const GoalStats: React.FC<GoalStatsProps> = ({ goal, entries }) => {
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span
-            className={`inline-block h-3 w-3 rounded-full ${goal.isActive ? 'bg-green-500' : 'bg-red-500'}`}
-            title={goal.isActive ? 'Active' : 'Inactive'}
-            aria-label={goal.isActive ? 'Active' : 'Inactive'}
+            className={`inline-block h-3 w-3 rounded-full ${goal.active ? 'bg-green-500' : 'bg-red-500'}`}
+            title={goal.active ? 'Active' : 'Inactive'}
+            aria-label={goal.active ? 'Active' : 'Inactive'}
           />
           <h2 className="text-2xl font-bold text-[var(--text-primary)]">{goal.name}</h2>
         </div>

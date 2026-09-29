@@ -43,7 +43,7 @@ class TargetHistoryRepositoryIntegrationTest {
         goal.setAmountPerPeriod(BigDecimal.TWO);
         goal.setTargetValue(BigDecimal.TEN);
         goal.setUnit("test_unit");
-        goal.setIsActive(true);
+        goal.setActive(true);
 
         Goal savedGoal = goalRepository.saveAndFlush(goal);
 

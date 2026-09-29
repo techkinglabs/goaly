@@ -9,7 +9,7 @@ const makeGoal = (overrides: Partial<Goal> = {}): Goal => ({
   name: 'Read',
   unit: 'min',
   targetValue: 60,
-  isActive: true,
+  active: true,
   period: 'WEEK',
   ...overrides,
 });

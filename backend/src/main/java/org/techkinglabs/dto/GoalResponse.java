@@ -9,7 +9,7 @@ public record GoalResponse(
     String name,
     String unit,
     BigDecimal targetValue,
-    Boolean isActive,
+    boolean active,
     String description,
     Period period,
     BigDecimal amountPerPeriod,

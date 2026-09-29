@@ -62,7 +62,8 @@ class GoalControllerValidationTest {
                     "unit": "hours",
                     "targetValue": 8,
                     "amountPerPeriod": 8,
-                    "period": "WEEK"
+                    "period": "WEEK",
+                    "active": false
                 }
                 """;
 

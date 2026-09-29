@@ -36,7 +36,7 @@ class GoalRepositoryIntegrationTest {
         goal.setAmountPerPeriod(BigDecimal.TWO);
         goal.setTargetValue(BigDecimal.TEN);
         goal.setUnit("test_unit");
-        goal.setIsActive(true);
+        goal.setActive(true);
 
         Goal savedGoal = goalRepository.save(goal);
 
@@ -50,6 +50,6 @@ class GoalRepositoryIntegrationTest {
         assertThat(foundGoal.getAmountPerPeriod()).isEqualByComparingTo(BigDecimal.TWO);
         assertThat(foundGoal.getTargetValue()).isEqualByComparingTo(BigDecimal.TEN);
         assertThat(foundGoal.getUnit()).isEqualTo("test_unit");
-        assertThat(foundGoal.getIsActive()).isTrue();
+        assertThat(foundGoal.isActive()).isTrue();
     }
 }

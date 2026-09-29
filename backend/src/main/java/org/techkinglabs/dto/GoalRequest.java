@@ -12,7 +12,7 @@ public record GoalRequest(
     @NotNull(message = "Target value is required")
     @DecimalMin(value = "0.0", inclusive = false, message = "Target value must be greater than zero")
     BigDecimal targetValue,
-    Boolean isActive,
+    Boolean active,
     String description,
     Period period,
     @DecimalMin(value = "0.0", message = "Amount per period must not be negative")

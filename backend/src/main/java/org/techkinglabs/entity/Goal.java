@@ -37,8 +37,8 @@ public class Goal {
     @Column(name = "amount_per_period", nullable = false)
     private BigDecimal amountPerPeriod = BigDecimal.ZERO;
 
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true;
+    @Column(name = "active", nullable = false)
+    private boolean active = true;
 
     @Column(name = "description")
     private String description;

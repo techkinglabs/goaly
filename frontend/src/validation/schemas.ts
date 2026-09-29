@@ -84,7 +84,7 @@ export interface GoalFormValues {
   targetValue: string;
   amountPerPeriod: string;
   period: string;
-  isActive: boolean;
+  active: boolean;
   description: string;
 }
 
@@ -98,7 +98,7 @@ export const goalFormSchema = z
     targetValue: numericString({ fieldLabel: 'Target value', min: 0, minInclusive: false }),
     amountPerPeriod: optionalNumericString({ fieldLabel: 'Amount per period', min: 0 }),
     period: z.enum(GOAL_PERIODS),
-    isActive: z.boolean(),
+    active: z.boolean(),
     description: z.string().trim(),
   })
   .transform((values, ctx) => {
@@ -114,7 +114,7 @@ export const goalFormSchema = z
       name: values.name,
       unit: resolvedUnit,
       targetValue: values.targetValue,
-      isActive: values.isActive,
+      active: values.active,
       description: values.description,
       period: values.period,
       // Empty "amount per period" intentionally falls back to the target value.

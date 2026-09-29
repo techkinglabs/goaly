@@ -106,8 +106,8 @@ const GoalListItem = React.memo<GoalListItemProps>(
                 <TrashIcon />
               </button>
             ) : null}
-            <span className={`badge ${goal.isActive ? 'badge-success' : 'badge-danger'}`}>
-              {goal.isActive ? 'Active' : 'Inactive'}
+            <span className={`badge ${goal.active ? 'badge-success' : 'badge-danger'}`}>
+              {goal.active ? 'Active' : 'Inactive'}
             </span>
           </div>
         </div>

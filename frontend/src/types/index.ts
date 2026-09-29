@@ -27,7 +27,7 @@ export interface Goal {
   name: string;
   unit: string;
   targetValue: number;
-  isActive: boolean;
+  active: boolean;
   description?: string;
   period?: GoalPeriod;
   amountPerPeriod?: number;
@@ -55,7 +55,7 @@ export interface GoalPayload {
   name: string;
   unit: string;
   targetValue: number;
-  isActive: boolean;
+  active: boolean;
   description?: string;
   period?: GoalPeriod;
   amountPerPeriod?: number;
