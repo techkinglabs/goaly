@@ -12,6 +12,8 @@ import org.techkinglabs.mapper.GoalMapper;
 import org.techkinglabs.service.GoalService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.techkinglabs.service.TargetHistoryService;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -22,16 +24,18 @@ import java.util.stream.Collectors;
 public class GoalController {
 
     private final GoalService goalService;
+    private final TargetHistoryService targetHistoryService;
 
-    public GoalController(GoalService goalService) {
+    public GoalController(GoalService goalService, TargetHistoryService targetHistoryService) {
         this.goalService = goalService;
+        this.targetHistoryService = targetHistoryService;
     }
 
     @GetMapping
     public List<GoalResponse> getAllGoals(@RequestParam(required = false) Boolean active) {
         List<Goal> goals = goalService.getGoals(active);
         List<Long> goalIds = goals.stream().map(Goal::getId).toList();
-        Map<Long, List<TargetHistory>> histories = goalService.getTargetHistoryByGoalIds(goalIds);
+        Map<Long, List<TargetHistory>> histories = targetHistoryService.getTargetHistoryByGoalIds(goalIds);
         return goals.stream()
                 .map(g -> GoalMapper.toResponse(g, histories.get(g.getId())))
                 .collect(Collectors.toList());
@@ -40,7 +44,7 @@ public class GoalController {
     @GetMapping("/{id}")
     public ResponseEntity<GoalResponse> getGoalById(@PathVariable Long id) {
         return goalService.getGoalById(id)
-                .map(goal -> ResponseEntity.ok(GoalMapper.toResponse(goal, goalService.getTargetHistory(goal.getId()))))
+                .map(goal -> ResponseEntity.ok(GoalMapper.toResponse(goal, targetHistoryService.getTargetHistory(goal.getId()))))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -48,7 +52,7 @@ public class GoalController {
     public ResponseEntity<GoalResponse> createGoal(@RequestBody @Valid GoalRequest goalRequest) {
         Goal goal = GoalMapper.toEntity(goalRequest);
         Goal createdGoal = goalService.createGoal(goal);
-        return ResponseEntity.status(201).body(GoalMapper.toResponse(createdGoal, goalService.getTargetHistory(createdGoal.getId())));
+        return ResponseEntity.status(201).body(GoalMapper.toResponse(createdGoal, targetHistoryService.getTargetHistory(createdGoal.getId())));
     }
 
     @PutMapping("/{id}")
@@ -56,7 +60,7 @@ public class GoalController {
         Goal goal = goalService.getGoalById(id).orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + id));
         GoalMapper.updateEntityFromRequest(goalRequest, goal);
         Goal updatedGoal = goalService.updateGoal(goal, effectiveSeedValue(goal, goalRequest.amountPerPeriod()));
-        return ResponseEntity.ok(GoalMapper.toResponse(updatedGoal, goalService.getTargetHistory(updatedGoal.getId())));
+        return ResponseEntity.ok(GoalMapper.toResponse(updatedGoal, targetHistoryService.getTargetHistory(updatedGoal.getId())));
     }
 
     private BigDecimal effectiveSeedValue(Goal goal, BigDecimal requestedAmountPerPeriod) {
@@ -76,13 +80,13 @@ public class GoalController {
     public ResponseEntity<TargetHistoryResponse> addTargetHistory(
             @PathVariable Long id,
             @Valid @RequestBody TargetHistoryRequest targetHistoryRequest)  {
-        TargetHistory history = goalService.addTargetHistory(id, targetHistoryRequest.validFrom(), targetHistoryRequest.validTo(), targetHistoryRequest.value(), targetHistoryRequest.period());
+        TargetHistory history = targetHistoryService.addTargetHistory(id, targetHistoryRequest.validFrom(), targetHistoryRequest.validTo(), targetHistoryRequest.value(), targetHistoryRequest.period());
         return ResponseEntity.status(201).body(GoalMapper.toTargetHistoryResponse(history));
     }
 
     @GetMapping("/{id}/target")
     public List<TargetHistoryResponse> getTargetHistory(@PathVariable Long id) {
-        return goalService.getTargetHistory(id).stream()
+        return targetHistoryService.getTargetHistory(id).stream()
                 .map(GoalMapper::toTargetHistoryResponse)
                 .collect(Collectors.toList());
     }
@@ -92,13 +96,13 @@ public class GoalController {
             @PathVariable Long id,
             @PathVariable Long historyId,
             @Valid @RequestBody TargetHistoryRequest targetHistoryRequest) {
-        TargetHistory history = goalService.updateTargetHistory(id, historyId,targetHistoryRequest.validFrom() , targetHistoryRequest.validTo(), targetHistoryRequest.value(), targetHistoryRequest.period());
+        TargetHistory history = targetHistoryService.updateTargetHistory(id, historyId,targetHistoryRequest.validFrom() , targetHistoryRequest.validTo(), targetHistoryRequest.value(), targetHistoryRequest.period());
         return ResponseEntity.ok(GoalMapper.toTargetHistoryResponse(history));
     }
 
     @DeleteMapping("/{id}/target/{historyId}")
     public ResponseEntity<Void> deleteTargetHistory(@PathVariable Long id, @PathVariable Long historyId) {
-        goalService.deleteTargetHistory(id, historyId);
+        targetHistoryService.deleteTargetHistory(id, historyId);
         return ResponseEntity.noContent().build();
     }
 }

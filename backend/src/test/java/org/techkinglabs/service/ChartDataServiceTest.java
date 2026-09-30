@@ -32,6 +32,9 @@ class ChartDataServiceTest {
     private GoalRepository goalRepository;
 
     @Mock
+    private TargetHistoryService targetHistoryService;
+
+    @Mock
     private GoalService goalService;
 
     @Mock
@@ -82,7 +85,7 @@ class ChartDataServiceTest {
                 entry(2L, monday, 5)   // Monday
         ));
         Goal g = goal();
-        when(goalService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
+        when(targetHistoryService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
                 history(LocalDate.of(2025, 12, 29))
         )));
 
@@ -103,7 +106,7 @@ class ChartDataServiceTest {
                 entry(3L, anchor, 5)                  // boundary inclusive
         ));
         when(goalRepository.findAll()).thenReturn(List.of(goal()));
-        when(goalService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
+        when(targetHistoryService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
                 history(LocalDate.of(2026, 1, 1))
         )));
 
@@ -122,7 +125,7 @@ class ChartDataServiceTest {
                 entry(2L, tuesday, 6)  // Tuesday, same week
         ));
         Goal g = goal();
-        when(goalService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
+        when(targetHistoryService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
                 history(LocalDate.of(2026, 2, 23))
         )));
 
@@ -141,7 +144,7 @@ class ChartDataServiceTest {
                 entry(1L, date, 5)
         ));
         Goal g = goal();
-        when(goalService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
+        when(targetHistoryService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
                 history(LocalDate.of(2026, 2, 22))
         )));
 
@@ -161,7 +164,7 @@ class ChartDataServiceTest {
                 entry(1L, week1Mon, 5),
                 entry(2L, week2Mon, 5)
         ));
-        when(goalService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
+        when(targetHistoryService.getTargetHistoryByGoalIds(List.of(1L))).thenReturn(Map.of(1L, List.of(
                 history(LocalDate.of(2026, 2, 23))
         )));
 

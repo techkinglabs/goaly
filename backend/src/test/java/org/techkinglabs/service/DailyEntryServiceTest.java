@@ -29,6 +29,9 @@ class DailyEntryServiceTest {
     private GoalService goalService;
 
     @Mock
+    private  TargetHistoryService targetHistoryService;
+
+    @Mock
     private Clock clock;
 
     @InjectMocks
@@ -65,14 +68,14 @@ class DailyEntryServiceTest {
         entry.setActualValue(new BigDecimal("5"));
         entry.setTargetValue(new BigDecimal("8"));
 
-        when(goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate())).thenReturn(new BigDecimal("12"));
+        when(targetHistoryService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate())).thenReturn(new BigDecimal("12"));
         when(goalService.getGoalById(1L)).thenReturn(Optional.of(new Goal(1L, null, null, null, null, null, true, "desc")));
         when(dailyEntryRepository.save(entry)).thenReturn(entry);
 
         DailyEntry result = dailyEntryService.createDailyEntry(entry);
 
         assertEquals(new BigDecimal("12"), result.getTargetValue());
-        verify(goalService).getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
+        verify(targetHistoryService).getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
         verify(dailyEntryRepository).save(entry);
     }
 
@@ -89,7 +92,7 @@ class DailyEntryServiceTest {
         moved.setEntryDate(LocalDate.of(2026, 1, 1));
 
         when(goalService.getGoalById(moved.getGoalId())).thenReturn(Optional.of(new Goal(1L, null, null, null, null, null, true, "desc")));
-        when(goalService.getEffectiveTarget(moved.getGoalId(), moved.getEntryDate())).thenReturn(new BigDecimal("9"));
+        when(targetHistoryService.getEffectiveTarget(moved.getGoalId(), moved.getEntryDate())).thenReturn(new BigDecimal("9"));
         when(dailyEntryRepository.save(moved)).thenReturn(moved);
 
         DailyEntry result = dailyEntryService.updateDailyEntry(moved);
@@ -106,7 +109,7 @@ class DailyEntryServiceTest {
         entry.setEntryDate(LocalDate.of(2026, 1, 1));
 
         when(goalService.getGoalById(entry.getGoalId())).thenReturn(Optional.of(new Goal(1L, null, null, null, null, null, true, "desc")));
-        when(goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate())).thenReturn(new BigDecimal("9"));
+        when(targetHistoryService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate())).thenReturn(new BigDecimal("9"));
         when(dailyEntryRepository.save(entry)).thenReturn(entry);
 
         DailyEntry result = dailyEntryService.updateDailyEntry(entry);

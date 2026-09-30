@@ -8,6 +8,8 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.techkinglabs.entity.Goal;
 import org.techkinglabs.model.Period;
 import org.techkinglabs.service.GoalService;
+import org.techkinglabs.service.TargetHistoryService;
+
 import java.math.BigDecimal;
 import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,7 +23,8 @@ class GoalControllerValidationTest {
     @Test
     void validationErrorShouldReturn400BadRequestNot500InternalServerError() throws Exception {
         GoalService goalService = mock(GoalService.class);
-        GoalController controller = new GoalController(goalService);
+        TargetHistoryService targetHistoryService = mock(TargetHistoryService.class);
+        GoalController controller = new GoalController(goalService,targetHistoryService);
 
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -39,7 +42,8 @@ class GoalControllerValidationTest {
     @Test
     void validRequestShouldReturn201Created() throws Exception {
         GoalService goalService = mock(GoalService.class);
-        GoalController controller = new GoalController(goalService);
+        TargetHistoryService targetHistoryService = mock(TargetHistoryService.class);
+        GoalController controller = new GoalController(goalService,targetHistoryService);
 
         Goal createdGoal = new Goal();
         createdGoal.setId(1L);
@@ -49,7 +53,7 @@ class GoalControllerValidationTest {
         createdGoal.setAmountPerPeriod(new BigDecimal("8"));
         createdGoal.setPeriod(Period.WEEK);
         when(goalService.createGoal(any(Goal.class))).thenReturn(createdGoal);
-        when(goalService.getTargetHistory(1L)).thenReturn(List.of());
+        when(targetHistoryService.getTargetHistory(1L)).thenReturn(List.of());
 
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())

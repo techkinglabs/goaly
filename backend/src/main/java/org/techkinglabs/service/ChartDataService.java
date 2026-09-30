@@ -1,5 +1,6 @@
 package org.techkinglabs.service;
 
+import org.springframework.transaction.annotation.Transactional;
 import org.techkinglabs.dto.ChartDataPoint;
 import org.techkinglabs.entity.DailyEntry;
 import org.techkinglabs.entity.Goal;
@@ -19,33 +20,34 @@ public class ChartDataService {
 
     private final DailyEntryService dailyEntryService;
     private final GoalRepository goalRepository;
-    private final GoalService goalService;
     private final Clock clock;
+    private final TargetHistoryService targetHistoryService;
 
     public ChartDataService(DailyEntryService dailyEntryService,
                             GoalRepository goalRepository,
-                            GoalService goalService,
-                            Clock clock) {
+                            Clock clock, TargetHistoryService targetHistoryService) {
         this.dailyEntryService = dailyEntryService;
         this.goalRepository = goalRepository;
-        this.goalService = goalService;
         this.clock = clock;
+        this.targetHistoryService = targetHistoryService;
     }
 
+    @Transactional(readOnly = true)
     public List<ChartDataPoint> getChartDataForAllGoals(String range, LocalDate anchor) {
         LocalDate today = LocalDate.now(clock);
         LocalDate anchorDate = anchor != null ? anchor : today;
         LocalDate from = resolveFrom(range, anchorDate);
         List<DailyEntry> entries = dailyEntryService.getEntriesFrom(from);
         List<Goal> goals = goalRepository.findAll();
-        Map<Long, List<TargetHistory>> histories = goalService.getTargetHistoryByGoalIds(
+        Map<Long, List<TargetHistory>> histories = targetHistoryService.getTargetHistoryByGoalIds(
                 goals.stream().map(Goal::getId).toList());
         return buildSeries(entries, goals, histories, range, anchor);
     }
 
+    @Transactional(readOnly = true)
     public List<ChartDataPoint> getChartDataForGoal(Goal goal, String range, LocalDate anchor) {
         List<DailyEntry> entries = dailyEntryService.getEntriesByGoalId(goal.getId());
-        Map<Long, List<TargetHistory>> histories = goalService.getTargetHistoryByGoalIds(List.of(goal.getId()));
+        Map<Long, List<TargetHistory>> histories = targetHistoryService.getTargetHistoryByGoalIds(List.of(goal.getId()));
         return buildSeries(entries, List.of(goal), histories, range, anchor);
     }
 

@@ -1,5 +1,6 @@
 package org.techkinglabs.service;
 
+import org.springframework.transaction.annotation.Transactional;
 import org.techkinglabs.entity.DailyEntry;
 import org.techkinglabs.exception.ResourceNotFoundException;
 import org.techkinglabs.repository.DailyEntryRepository;
@@ -16,21 +17,26 @@ public class DailyEntryService {
     private final DailyEntryRepository dailyEntryRepository;
     private final GoalService goalService;
     private final Clock clock;
+    private final TargetHistoryService targetHistoryService;
 
-    public DailyEntryService(DailyEntryRepository dailyEntryRepository, GoalService goalService, Clock clock) {
+    public DailyEntryService(DailyEntryRepository dailyEntryRepository, GoalService goalService, Clock clock, TargetHistoryService targetHistoryService) {
         this.dailyEntryRepository = dailyEntryRepository;
         this.goalService = goalService;
         this.clock = clock;
+        this.targetHistoryService = targetHistoryService;
     }
 
+    @Transactional(readOnly = true)
     public List<DailyEntry> getEntriesByGoalId(Long goalId) {
         return dailyEntryRepository.findByGoalIdOrderByEntryDate(goalId);
     }
 
+    @Transactional(readOnly = true)
     public List<DailyEntry> getAllEntries() {
         return dailyEntryRepository.findAll();
     }
 
+    @Transactional(readOnly = true)
     public List<DailyEntry> getEntriesFrom(LocalDate from) {
         if (from == null) {
             return dailyEntryRepository.findAll();
@@ -38,10 +44,12 @@ public class DailyEntryService {
         return dailyEntryRepository.findByEntryDateGreaterThanEqualOrderByEntryDate(from);
     }
 
+    @Transactional(readOnly = true)
     public Optional<DailyEntry> getEntryById(Long id) {
         return dailyEntryRepository.findById(id);
     }
 
+    @Transactional
     public DailyEntry createDailyEntry(DailyEntry entry) {
         if (entry.getEntryDate().isAfter(LocalDate.now(clock))) {
             throw new IllegalArgumentException("Entry date must not be in the future");
@@ -49,12 +57,13 @@ public class DailyEntryService {
         if (goalService.getGoalById(entry.getGoalId()).isEmpty()) {
             throw new ResourceNotFoundException("Goal not found with id: " + entry.getGoalId());
         }
-        BigDecimal effectiveTarget = goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
+        BigDecimal effectiveTarget = targetHistoryService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
         entry.setTargetValue(effectiveTarget);
 
         return dailyEntryRepository.save(entry);
     }
 
+    @Transactional
     public DailyEntry updateDailyEntry(DailyEntry entry) {
         if (entry.getEntryDate().isAfter(LocalDate.now(clock))) {
             throw new IllegalArgumentException("Entry date must not be in the future");
@@ -62,12 +71,13 @@ public class DailyEntryService {
         if (goalService.getGoalById(entry.getGoalId()).isEmpty()) {
             throw new ResourceNotFoundException("Goal not found with id: " + entry.getGoalId());
         }
-        BigDecimal effectiveTarget = goalService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
+        BigDecimal effectiveTarget = targetHistoryService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
         entry.setTargetValue(effectiveTarget);
 
         return dailyEntryRepository.save(entry);
     }
 
+    @Transactional
     public void deleteDailyEntry(Long id) {
         DailyEntry entry = dailyEntryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Daily entry not found with id: " + id));
