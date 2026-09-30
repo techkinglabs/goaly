@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import type { Goal } from '../types';
-import { periodLabel } from '../utils/goalMath';
+import { effectiveGoalTarget, effectiveGoalPeriod, periodLabel } from '../utils/goalMath';
 import EmptyState from './ui/EmptyState';
 import { PencilIcon, TrashIcon } from './ui/icons';
 
@@ -129,8 +129,8 @@ const GoalListItem = React.memo<GoalListItemProps>(
           <div className="mt-1 flex justify-between text-xs text-[var(--text-muted)]">
             <span>{progress.toFixed(0)}%</span>
             <span>
-              {goal.targetValue} {goal.unit}
-              {goal.period ? ` (${periodLabel(goal.period)})` : ''}
+              {effectiveGoalTarget(goal)} {goal.unit}
+              {effectiveGoalPeriod(goal) ? ` (${periodLabel(effectiveGoalPeriod(goal))})` : ''}
             </span>
           </div>
         </div>
@@ -166,7 +166,8 @@ const GoalList: React.FC<GoalListProps> = ({
         // Progress is the current week's actual vs. target; it is intentionally
         // NOT clamped to 100% and resets to 0 at the start of a new week.
         const total = weekTotalsByGoalId.get(goal.id) ?? 0;
-        const progress = goal.targetValue > 0 ? (total / goal.targetValue) * 100 : 0;
+        const target = effectiveGoalTarget(goal);
+        const progress = target > 0 ? (total / target) * 100 : 0;
 
         return (
           <GoalListItem

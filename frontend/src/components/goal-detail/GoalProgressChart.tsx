@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import type { ChartRange, DailyEntry, Goal } from '../../types';
 import { CHART_RANGE_LABELS, CHART_RANGES } from '../../types';
-import { buildProgressSeries } from '../../utils/goalMath';
+import { buildProgressSeries, effectiveGoalTarget } from '../../utils/goalMath';
 import ChartCard from '../ChartCard';
 import EmptyState from '../ui/EmptyState';
 
@@ -57,7 +57,7 @@ const GoalProgressChart: React.FC<GoalProgressChartProps> = ({
   }, [percentDomainMax]);
 
   const rawTicks = useMemo(() => {
-    const { targetValue } = goal;
+    const targetValue = effectiveGoalTarget(goal);
     return [
       0,
       targetValue / 4,
@@ -108,14 +108,14 @@ const GoalProgressChart: React.FC<GoalProgressChartProps> = ({
                 ticks={percentTicks}
                 tickFormatter={(value) => `${value}%`}
               />
-              <YAxis
-                yAxisId="raw"
-                orientation="right"
-                className={axisClassName}
-                domain={[0, Math.max(goal.targetValue, maxTotalRaw)]}
-                ticks={rawTicks}
-                tickFormatter={(value) => `${value} ${goal.unit}`}
-              />
+               <YAxis
+                 yAxisId="raw"
+                 orientation="right"
+                 className={axisClassName}
+                 domain={[0, Math.max(effectiveGoalTarget(goal), maxTotalRaw)]}
+                 ticks={rawTicks}
+                 tickFormatter={(value) => `${value} ${goal.unit}`}
+               />
 
               <ReferenceLine
                 yAxisId="percent"

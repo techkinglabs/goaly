@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildProgressSeries, periodStartForDate } from './goalMath';
-import type { DailyEntry, Goal } from '../types';
+import type { DailyEntry, Goal, TargetHistoryEntry } from '../types';
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
 
@@ -8,10 +8,16 @@ const makeGoal = (overrides: Partial<Goal> = {}): Goal => ({
   id: 1,
   name: 'Read',
   unit: 'min',
-  targetValue: 60,
   active: true,
-  period: 'WEEK',
   ...overrides,
+});
+
+const makeHistory = (from: string, targetValue: number, period: TargetHistoryEntry['period'] = 'WEEK'): TargetHistoryEntry => ({
+  id: 1,
+  goalId: 1,
+  validFrom: from,
+  targetValue,
+  period,
 });
 
 const entry = (entryDate: string, actualValue: number): DailyEntry => ({
@@ -57,7 +63,7 @@ describe('buildProgressSeries 7d', () => {
     });
 
     const { buildProgressSeries: fn } = await import('./goalMath');
-    const goal = makeGoal({ targetValue: 60, amountPerPeriod: 60, period: 'WEEK' });
+    const goal = makeGoal({ targetHistory: [makeHistory('2026-08-01', 60, 'WEEK')] });
     // Single entry on the last day of the window (Sunday).
     const entries = [entry('2026-08-30', 16)];
 
@@ -90,7 +96,7 @@ describe('buildProgressSeries 7d', () => {
     });
 
     const { buildProgressSeries: fn } = await import('./goalMath');
-    const goal = makeGoal({ targetValue: 60, amountPerPeriod: 60, period: 'WEEK' });
+    const goal = makeGoal({ targetHistory: [makeHistory('2026-08-01', 60, 'WEEK')] });
     // Entry on Tuesday (the first day of the window, in the prior calendar week).
     const entries = [entry('2026-08-25', 16)];
 

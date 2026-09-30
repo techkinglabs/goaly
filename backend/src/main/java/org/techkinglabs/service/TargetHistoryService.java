@@ -2,16 +2,13 @@ package org.techkinglabs.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.techkinglabs.entity.Goal;
 import org.techkinglabs.entity.TargetHistory;
 import org.techkinglabs.exception.GoalNotFoundException;
 import org.techkinglabs.exception.ResourceNotFoundException;
 import org.techkinglabs.model.Period;
 import org.techkinglabs.repository.GoalRepository;
 import org.techkinglabs.repository.TargetHistoryRepository;
-
 import java.math.BigDecimal;
-import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -22,12 +19,10 @@ import java.util.stream.Collectors;
 public class TargetHistoryService {
 
     private final TargetHistoryRepository targetHistoryRepository;
-    private final Clock clock;
     private final GoalRepository goalRepository;
 
-    public TargetHistoryService(TargetHistoryRepository targetHistoryRepository, Clock clock, GoalRepository goalRepository) {
+    public TargetHistoryService(TargetHistoryRepository targetHistoryRepository, GoalRepository goalRepository) {
         this.targetHistoryRepository = targetHistoryRepository;
-        this.clock = clock;
         this.goalRepository = goalRepository;
     }
 
@@ -47,8 +42,7 @@ public class TargetHistoryService {
 
     @Transactional
     public TargetHistory addTargetHistory(Long goalId, LocalDate validFrom, LocalDate validTo, BigDecimal value, Period period) {
-        Goal goal = goalRepository.findById(goalId)
-                .orElseThrow(() -> new GoalNotFoundException(goalId));
+        goalRepository.findById(goalId).orElseThrow(() -> new GoalNotFoundException(goalId));
 
         if (validTo != null && validTo.isBefore(validFrom)) {
             throw new IllegalArgumentException("validTo must not be before validFrom");
@@ -58,7 +52,7 @@ public class TargetHistoryService {
         TargetHistory history;
         if (existing.isPresent() && existing.get().getValidFrom().isEqual(validFrom)) {
             history = existing.get();
-            history.setValue(value);
+            history.setTargetValue(value);
             history.setPeriod(period);
             if (validTo != null) {
                 history.setValidTo(validTo);
@@ -80,7 +74,7 @@ public class TargetHistoryService {
             history.setGoalId(goalId);
             history.setValidFrom(validFrom);
             history.setValidTo(validTo);
-            history.setValue(value);
+            history.setTargetValue(value);
             history.setPeriod(period);
             TargetHistory next = targetHistoryRepository
                     .findFirstByGoalIdAndValidFromGreaterThanOrderByValidFromAsc(goalId, validFrom)
@@ -93,17 +87,11 @@ public class TargetHistoryService {
 
         relinkTargetHistory(goalId);
 
-        if (validFrom != null && !validFrom.isAfter(LocalDate.now(clock))) {
-            applyEffectiveTarget(goal, value, period);
-        }
-
         return targetHistoryRepository.findById(saved.getId()).orElse(saved);
     }
 
     @Transactional
     public TargetHistory updateTargetHistory(Long goalId, Long historyId, LocalDate validFrom, LocalDate validTo, BigDecimal value, Period period) {
-        Goal goal = goalRepository.findById(goalId)
-                .orElseThrow(() -> new GoalNotFoundException(goalId));
 
         TargetHistory history = targetHistoryRepository.findById(historyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Target history not found with id: " + historyId));
@@ -127,16 +115,10 @@ public class TargetHistoryService {
         }
         history.setValidFrom(validFrom);
         history.setValidTo(validTo);
-        history.setValue(value);
+        history.setTargetValue(value);
         history.setPeriod(period);
         TargetHistory saved = targetHistoryRepository.save(history);
         relinkTargetHistory(goalId);
-        TargetHistory effectiveToday = targetHistoryRepository
-                .findFirstByGoalIdAndValidFromLessThanEqualOrderByValidFromDesc(goalId, LocalDate.now(clock))
-                .orElse(null);
-        if (effectiveToday != null && effectiveToday.getId().equals(saved.getId())) {
-            applyEffectiveTarget(goal, saved.getValue(), saved.getPeriod());
-        }
         return targetHistoryRepository.findById(saved.getId()).orElse(saved);
     }
 
@@ -155,8 +137,6 @@ public class TargetHistoryService {
 
     @Transactional
     public void deleteTargetHistory(Long goalId, Long historyId) {
-        Goal goal = goalRepository.findById(goalId)
-                                .orElseThrow(() -> new GoalNotFoundException(goalId));
 
         TargetHistory history = targetHistoryRepository.findById(historyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Target history not found with id: " + historyId));
@@ -165,34 +145,18 @@ public class TargetHistoryService {
         }
         targetHistoryRepository.delete(history);
         this.relinkTargetHistory(goalId);
-
-        TargetHistory effectiveToday = targetHistoryRepository
-                .findFirstByGoalIdAndValidFromLessThanEqualOrderByValidFromDesc(goalId, LocalDate.now(clock))
-                .orElse(null);
-        if (effectiveToday != null) {
-            applyEffectiveTarget(goal, effectiveToday.getValue(), effectiveToday.getPeriod());
-        } else {
-            applyEffectiveTarget(goal, BigDecimal.ZERO, goal.getPeriod());
-        }
     }
 
     @Transactional(readOnly = true)
     public BigDecimal getEffectiveTarget(Long goalId, LocalDate date) {
         return targetHistoryRepository
                 .findFirstByGoalIdAndValidFromLessThanEqualOrderByValidFromDesc(goalId, date)
-                .map(TargetHistory::getValue)
+                .map(TargetHistory::getTargetValue)
                 .orElse(BigDecimal.ZERO);
     }
 
     @Transactional
     public void deleteAllTargetHistoryByGoalId(Long id) {
         targetHistoryRepository.deleteByGoalId(id);
-    }
-
-    private void applyEffectiveTarget(Goal goal, BigDecimal value, Period period) {
-        goal.setAmountPerPeriod(value);
-        goal.setPeriod(period);
-        goal.setTargetValue(value);
-        goalRepository.save(goal);
     }
 }

@@ -33,36 +33,65 @@ export function derivePeriodEquivalents(value: number, period: string): PeriodEq
   };
 }
 
-/** Derived week/month/year targets for a goal. */
+/**
+ * Returns the target-history entry whose `validFrom` is the latest one on or
+ * before `date`, honouring `validTo` (when set). Returns `null` when no entry
+ * applies.
+ */
+export function effectiveHistoryEntry(
+  goal: Goal,
+  date: Date
+): TargetHistoryEntry | null {
+  const history = goal.targetHistory;
+  if (!history || history.length === 0) return null;
+  let best: TargetHistoryEntry | null = null;
+  for (const entry of history) {
+    const from = parseLocalDate(entry.validFrom);
+    if (from <= date && (best === null || from > parseLocalDate(best.validFrom))) {
+      best = entry;
+    }
+  }
+  return best;
+}
+
+/** Period (e.g. "WEEK") of the target-history entry valid at `date`. */
+export function effectivePeriod(goal: Goal, date: Date): string {
+  return effectiveHistoryEntry(goal, date)?.period ?? 'WEEK';
+}
+
+/**
+ * Returns the effective target value (period amount) for `goal` at the current
+ * date — i.e. the `targetValue` of the latest target-history entry valid today.
+ */
+export function effectiveGoalTarget(goal: Goal): number {
+  return effectiveHistoryEntry(goal, today())?.targetValue ?? 0;
+}
+
+/**
+ * Returns the effective period (e.g. "WEEK") for `goal` at the current date.
+ */
+export function effectiveGoalPeriod(goal: Goal): string | undefined {
+  return effectiveHistoryEntry(goal, today())?.period;
+}
+
+/**
+ * Derived week/month/year targets for a goal.
+ * Uses the latest target-history entry; falls back to WEEK when none exists.
+ */
 export function derivePeriodTargets(goal: Goal): PeriodEquivalents {
-  const base =
-    goal.amountPerPeriod && goal.amountPerPeriod > 0
-      ? goal.amountPerPeriod
-      : (goal.targetValue ?? 0);
-  return derivePeriodEquivalents(base, goal.period ?? 'WEEK');
+  const now = effectiveHistoryEntry(goal, today());
+  const base = now?.targetValue ?? 0;
+  const period = now?.period ?? 'WEEK';
+  return derivePeriodEquivalents(base, period);
 }
 
 /**
  * The period (e.g. weekly) target valid at `date`, honouring `targetHistory`.
- * Falls back to the goal's own period amount when no history applies.
+ * Falls back to 0 when no history applies.
  */
 export function effectivePeriodTarget(goal: Goal, date: Date): number {
-  const history = goal.targetHistory;
-  if (history && history.length > 0) {
-    let best: TargetHistoryEntry | null = null;
-    for (const entry of history) {
-      const from = parseLocalDate(entry.validFrom);
-      if (from <= date && (best === null || from > parseLocalDate(best.validFrom))) {
-        best = entry;
-      }
-    }
-    if (best && Number.isFinite(best.value)) return best.value;
-  }
-  const base =
-    goal.amountPerPeriod && goal.amountPerPeriod > 0
-      ? goal.amountPerPeriod
-      : (goal.targetValue ?? 0);
-  return base;
+  const entry = effectiveHistoryEntry(goal, date);
+  return entry?.targetValue ?? 0;
 }
 
 /** Returns the ISO `YYYY-MM-DD` of the period-start date that contains `date`. */
@@ -159,8 +188,10 @@ export function buildProgressSeries(
   goal: Goal,
   range: ChartRange
 ): ProgressPoint[] {
-  const target = goal.targetValue > 0 ? goal.targetValue : 1;
-  const period = goal.period;
+  const now = effectiveHistoryEntry(goal, today());
+  const targetVal = now?.targetValue ?? 0;
+  const target = targetVal > 0 ? targetVal : 1;
+  const period = now?.period ?? 'WEEK';
 
   const valueByDate = new Map<string, number>();
   for (const entry of entries) {

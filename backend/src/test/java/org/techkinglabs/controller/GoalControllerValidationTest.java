@@ -6,11 +6,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.techkinglabs.entity.Goal;
-import org.techkinglabs.model.Period;
 import org.techkinglabs.service.GoalService;
 import org.techkinglabs.service.TargetHistoryService;
 
-import java.math.BigDecimal;
 import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,10 +47,7 @@ class GoalControllerValidationTest {
         createdGoal.setId(1L);
         createdGoal.setName("Sleep at 23:00");
         createdGoal.setUnit("hours");
-        createdGoal.setTargetValue(new BigDecimal("8"));
-        createdGoal.setAmountPerPeriod(new BigDecimal("8"));
-        createdGoal.setPeriod(Period.WEEK);
-        when(goalService.createGoal(any(Goal.class))).thenReturn(createdGoal);
+        when(goalService.createGoal(any(Goal.class), any(), any())).thenReturn(createdGoal);
         when(targetHistoryService.getTargetHistory(1L)).thenReturn(List.of());
 
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(controller)
@@ -64,9 +59,6 @@ class GoalControllerValidationTest {
                 {
                     "name": "Sleep at 23:00",
                     "unit": "hours",
-                    "targetValue": 8,
-                    "amountPerPeriod": 8,
-                    "period": "WEEK",
                     "active": false
                 }
                 """;

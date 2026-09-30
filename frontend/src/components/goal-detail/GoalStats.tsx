@@ -4,6 +4,7 @@ import {
   computeWeeklyChange,
   derivePeriodTargets,
   dailyProgressPercent,
+  effectiveGoalTarget,
 } from '../../utils/goalMath';
 import { startOfWeek, today, parseLocalDate } from '../../utils/date';
 
@@ -29,8 +30,9 @@ const GoalStats: React.FC<GoalStatsProps> = ({ goal, entries }) => {
   const weeklyChange = useMemo(() => computeWeeklyChange(entries), [entries]);
   const derived = useMemo(() => derivePeriodTargets(goal), [goal]);
 
-  const percentage = dailyProgressPercent(totalActual, goal.targetValue);
-  const targetHit = goal.targetValue > 0 && totalActual >= goal.targetValue;
+  const goalTarget = effectiveGoalTarget(goal);
+  const percentage = dailyProgressPercent(totalActual, goalTarget);
+  const targetHit = goalTarget > 0 && totalActual >= goalTarget;
 
   return (
     <div className="pane-detail mb-6">
@@ -59,7 +61,7 @@ const GoalStats: React.FC<GoalStatsProps> = ({ goal, entries }) => {
         <div className="stat-tile">
           <p className="text-sm text-[var(--text-muted)]">Delivered Target</p>
           <p className="text-xl font-semibold text-[var(--text-primary)]">
-            {totalActual.toFixed(1)} / {goal.targetValue} {goal.unit}
+             {totalActual.toFixed(1)} / {goalTarget} {goal.unit}
           </p>
           <p
             className={`mt-1 text-xs ${

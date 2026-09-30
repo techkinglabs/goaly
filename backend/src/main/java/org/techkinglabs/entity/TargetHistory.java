@@ -1,6 +1,7 @@
 package org.techkinglabs.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import org.techkinglabs.model.Period;
 import java.math.BigDecimal;
@@ -33,6 +34,8 @@ public class TargetHistory {
     @Column(name = "period", nullable = false)
     private Period period = Period.WEEK;
 
-    @Column(name = "value", nullable = false)
-    private BigDecimal value;
+    @Column(name = "target_value", nullable = false)
+    @NotNull(message = "Target value is required")
+    private BigDecimal targetValue;
+
 }

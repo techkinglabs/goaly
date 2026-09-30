@@ -2,10 +2,7 @@ package org.techkinglabs.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import org.techkinglabs.model.Period;
-import java.math.BigDecimal;
 
 @Getter
 @Setter
@@ -25,17 +22,6 @@ public class Goal {
     @Column(nullable = false)
     @NotBlank(message = "Unit is required")
     private String unit;
-
-    @Column(name = "target_value", nullable = false)
-    @NotNull(message = "Target value is required")
-    private BigDecimal targetValue;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "period", nullable = false)
-    private Period period = Period.WEEK;
-
-    @Column(name = "amount_per_period", nullable = false)
-    private BigDecimal amountPerPeriod = BigDecimal.ZERO;
 
     @Column(name = "active", nullable = false)
     private boolean active = true;

@@ -2,7 +2,7 @@ package org.techkinglabs.controller;
 
 import org.techkinglabs.dto.ChartDataPoint;
 import org.techkinglabs.entity.Goal;
-import org.techkinglabs.exception.ResourceNotFoundException;
+import org.techkinglabs.exception.GoalNotFoundException;
 import org.techkinglabs.repository.GoalRepository;
 import org.techkinglabs.service.ChartDataService;
 import org.springframework.http.HttpStatus;
@@ -51,7 +51,7 @@ public class ChartController {
 
         if (goalId != null) {
             Goal goal = goalRepository.findById(goalId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + goalId));
+                    .orElseThrow(() -> new GoalNotFoundException(goalId));
             return chartDataService.getChartDataForGoal(goal, normalizedRange, anchor);
         }
 

@@ -6,26 +6,26 @@ export interface TargetHistoryInput {
   goalId: number;
   validFrom: ISODateString;
   validTo?: ISODateString | null;
-  value: number;
+  targetValue: number;
   period?: GoalPeriod;
 }
 
 /**
  * The backend consumes a JSON request body that mirrors
  * {@code org.techkinglabs.dto.TargetHistoryRequest}
- * ({@code validFrom}, {@code validTo}, {@code value}, {@code period}),
+ * ({@code validFrom}, {@code validTo}, {@code targetValue}, {@code period}),
  * so the payload is sent verbatim as the request body.
  */
 export const targetHistoryService = {
-  add({ goalId, validFrom, validTo, value, period = 'WEEK' }: TargetHistoryInput): Promise<unknown> {
-    return http.post<unknown>(`/api/goals/${goalId}/target`, { validFrom, validTo, value, period });
+  add({ goalId, validFrom, validTo, targetValue, period = 'WEEK' }: TargetHistoryInput): Promise<unknown> {
+    return http.post<unknown>(`/api/goals/${goalId}/target`, { validFrom, validTo, targetValue, period });
   },
 
   update(
     historyId: number,
-    { goalId, validFrom, validTo, value, period = 'WEEK' }: TargetHistoryInput
+    { goalId, validFrom, validTo, targetValue, period = 'WEEK' }: TargetHistoryInput
   ): Promise<unknown> {
-    return http.put<unknown>(`/api/goals/${goalId}/target/${historyId}`, { validFrom, validTo, value, period });
+    return http.put<unknown>(`/api/goals/${goalId}/target/${historyId}`, { validFrom, validTo, targetValue, period });
   },
 
   remove(goalId: number, historyId: number): Promise<void> {

@@ -61,10 +61,11 @@ public class ChartDataService {
         final LocalDate windowFrom = (rawFrom != null && rawFrom.isAfter(today)) ? today : rawFrom;
         final LocalDate windowTo = to;
 
-        Map<Long, Period> goalPeriods = new HashMap<>();
+        Map<Long, Period> targetHistoryPeriods = new HashMap<>();
         List<Long> goalIds = new ArrayList<>();
         for (Goal g : goals) {
-            goalPeriods.put(g.getId(), g.getPeriod());
+            List<TargetHistory> history = historyByGoal.get(g.getId());
+            targetHistoryPeriods.put(g.getId(), history.getLast().getPeriod());
             goalIds.add(g.getId());
         }
 
@@ -79,13 +80,13 @@ public class ChartDataService {
             if (weekly) {
                 LocalDate bucket = startOfWeek(windowFrom);
                 while (!bucket.isAfter(windowTo)) {
-                    ensureBucket(bucket, groupedData, goalIds, goalPeriods, historyByGoal,
+                    ensureBucket(bucket, groupedData, goalIds, targetHistoryPeriods, historyByGoal,
                             runningActual, runningTarget, countedPeriods, today);
                     bucket = bucket.plusWeeks(1);
                 }
             } else {
                 for (LocalDate day = windowFrom; !day.isAfter(windowTo); day = day.plusDays(1)) {
-                    ensureBucket(day, groupedData, goalIds, goalPeriods, historyByGoal,
+                    ensureBucket(day, groupedData, goalIds, targetHistoryPeriods, historyByGoal,
                             runningActual, runningTarget, countedPeriods, today);
                 }
             }
@@ -97,7 +98,7 @@ public class ChartDataService {
                 .sorted(Comparator.comparing(DailyEntry::getEntryDate))
                 .toList();
 
-        seriesAccumulator(historyByGoal, filtered, weekly, groupedData, runningActual, goalPeriods, runningTarget, countedPeriods, today);
+        seriesAccumulator(historyByGoal, filtered, weekly, groupedData, runningActual, targetHistoryPeriods, runningTarget, countedPeriods, today);
 
         return new ArrayList<>(groupedData.values());
     }
@@ -166,7 +167,7 @@ public class ChartDataService {
                 break;
             }
         }
-        return effective != null ? effective.getValue() : BigDecimal.ZERO;
+        return effective != null ? effective.getTargetValue() : BigDecimal.ZERO;
     }
 
     private LocalDate resolveFrom(String range, LocalDate anchor) {

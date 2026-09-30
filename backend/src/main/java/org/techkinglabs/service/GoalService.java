@@ -7,6 +7,7 @@ import org.techkinglabs.model.Period;
 import org.techkinglabs.repository.GoalRepository;
 import org.techkinglabs.repository.DailyEntryRepository;
 import org.springframework.stereotype.Service;
+
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -19,14 +20,13 @@ public class GoalService {
     private final GoalRepository goalRepository;
 
     private final DailyEntryRepository dailyEntryRepository;
-    private final TargetHistoryService targetHistory;
-
+    private final TargetHistoryService targetHistoryService;
     private final Clock clock;
 
-    public GoalService(GoalRepository goalRepository, DailyEntryRepository dailyEntryRepository, TargetHistoryService targetHistory, Clock clock) {
+    public GoalService(GoalRepository goalRepository, DailyEntryRepository dailyEntryRepository, TargetHistoryService targetHistoryService, Clock clock) {
         this.goalRepository = goalRepository;
         this.dailyEntryRepository = dailyEntryRepository;
-        this.targetHistory = targetHistory;
+        this.targetHistoryService = targetHistoryService;
         this.clock = clock;
     }
 
@@ -44,33 +44,23 @@ public class GoalService {
     }
 
     @Transactional
-    public Goal createGoal(Goal goal) {
-        BigDecimal seedValue = Optional.ofNullable(goal.getAmountPerPeriod())
-                .or(() -> Optional.ofNullable(goal.getTargetValue()))
-                .orElse(BigDecimal.ZERO);
-
-        goal.setAmountPerPeriod(seedValue);
-        goal.setTargetValue(seedValue);
+    public Goal createGoal(Goal goal, BigDecimal initialTargetValue, Period initialPeriod) {
         Goal saved = goalRepository.save(goal);
-        Period period = saved.getPeriod()!= null? saved.getPeriod() : Period.WEEK;
-
-        targetHistory.addTargetHistory(goal.getId(),LocalDate.now(clock),null,seedValue,period);
-
+        if (initialTargetValue != null && initialPeriod != null) {
+            targetHistoryService.addTargetHistory(
+                    saved.getId(),
+                    LocalDate.now(clock),
+                    null,
+                    initialTargetValue,
+                    initialPeriod
+            );
+        }
         return saved;
     }
 
     @Transactional
-    public Goal updateGoal(Goal goal, BigDecimal effectiveSeedValue) {
-        Goal saved = goalRepository.save(goal);
-        LocalDate today = LocalDate.now(clock);
-        BigDecimal currentValue = targetHistory.getEffectiveTarget(goal.getId(), today);
-        if (currentValue.compareTo(effectiveSeedValue) != 0) {
-            targetHistory.addTargetHistory(goal.getId(), today, null, effectiveSeedValue, goal.getPeriod());
-            saved.setTargetValue(effectiveSeedValue);
-            saved.setAmountPerPeriod(effectiveSeedValue);
-            saved = goalRepository.save(saved);
-        }
-        return saved;
+    public Goal updateGoal(Goal goal) {
+        return goalRepository.save(goal);
     }
 
     @Transactional
@@ -79,7 +69,7 @@ public class GoalService {
                 .orElseThrow(() -> new GoalNotFoundException(id));
 
         dailyEntryRepository.deleteByGoalId(id);
-        targetHistory.deleteAllTargetHistoryByGoalId(id);
+        targetHistoryService.deleteAllTargetHistoryByGoalId(id);
 
         goalRepository.delete(goal);
     }

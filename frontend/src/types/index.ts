@@ -18,7 +18,7 @@ export interface TargetHistoryEntry {
   goalId: number;
   validFrom: ISODateString;
   validTo?: ISODateString | null;
-  value: number;
+  targetValue: number;
   period?: GoalPeriod;
 }
 
@@ -26,11 +26,8 @@ export interface Goal {
   id: number;
   name: string;
   unit: string;
-  targetValue: number;
   active: boolean;
   description?: string;
-  period?: GoalPeriod;
-  amountPerPeriod?: number;
   targetHistory?: TargetHistoryEntry[];
 }
 
@@ -54,12 +51,10 @@ export interface ChartDataPoint {
 export interface GoalPayload {
   name: string;
   unit: string;
-  targetValue: number;
   active: boolean;
   description?: string;
-  period?: GoalPeriod;
-  amountPerPeriod?: number;
   initialTargetValue?: number;
+  initialPeriod?: GoalPeriod;
 }
 
 export interface DailyEntryPayload {

@@ -5,7 +5,6 @@ import org.techkinglabs.dto.GoalRequest;
 import org.techkinglabs.dto.TargetHistoryResponse;
 import org.techkinglabs.entity.Goal;
 import org.techkinglabs.entity.TargetHistory;
-import org.techkinglabs.model.Period;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,11 +21,8 @@ public class GoalMapper {
             goal.getId(),
             goal.getName(),
             goal.getUnit(),
-            goal.getTargetValue(),
             goal.isActive(),
             goal.getDescription(),
-            goal.getPeriod(),
-            goal.getAmountPerPeriod(),
             history
         );
     }
@@ -38,7 +34,7 @@ public class GoalMapper {
             history.getGoalId(),
             history.getValidFrom(),
             history.getValidTo(),
-            history.getValue(),
+            history.getTargetValue(),
             history.getPeriod()
         );
     }
@@ -48,15 +44,10 @@ public class GoalMapper {
         Goal goal = new Goal();
         goal.setName(request.name());
         goal.setUnit(request.unit());
-        goal.setTargetValue(request.targetValue());
         goal.setActive(request.active() != null ? request.active() : true);
         goal.setDescription(request.description());
-        goal.setPeriod(request.period() != null ? request.period() : Period.WEEK);
-        // Keep the client value verbatim (null = "unspecified"); GoalService.createGoal
-        // resolves the documented optional-per-period fallback to targetValue. Forcing
-        // ZERO here would make an unspecified amount indistinguishable from 0 and let a
-        // valid positive target be clobbered into a zero effective target on create.
-        goal.setAmountPerPeriod(request.amountPerPeriod());
+        // targetValue/period/amountPerPeriod are now managed exclusively via
+        // TargetHistory; Goal itself no longer carries them.
         return goal;
     }
 
@@ -64,14 +55,9 @@ public class GoalMapper {
         if (request == null || goal == null) return;
         goal.setName(request.name());
         goal.setUnit(request.unit());
-        goal.setTargetValue(request.targetValue());
-        goal.setAmountPerPeriod(request.amountPerPeriod());
         if (request.active() != null) {
             goal.setActive(request.active());
         }
         goal.setDescription(request.description());
-        if (request.period() != null) {
-            goal.setPeriod(request.period());
-        }
     }
 }

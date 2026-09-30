@@ -8,6 +8,6 @@ import java.time.LocalDate;
 public record TargetHistoryRequest(
     @NotNull LocalDate validFrom,
     LocalDate validTo,
-    @NotNull BigDecimal value,
+    @NotNull BigDecimal targetValue,
     @NotNull Period period
 ) {}

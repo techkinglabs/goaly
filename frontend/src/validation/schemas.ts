@@ -7,7 +7,7 @@
  * previously produced targetValue=0 and division by zero downstream).
  */
 import { z } from 'zod';
-import { GOAL_PERIODS, TARGET_PERIODS } from '../types';
+import { GOAL_PERIODS, TARGET_PERIODS, type GoalPeriod } from '../types';
 import { isValidISODate } from '../utils/date';
 
 /** Required numeric string -> number. Rejects '', whitespace and non-numerics. */
@@ -81,11 +81,10 @@ export interface GoalFormValues {
   unit: string;
   customUnit: string;
   isCustomUnit: boolean;
-  targetValue: string;
-  amountPerPeriod: string;
-  period: string;
   active: boolean;
   description: string;
+  targetValue: string;
+  period: GoalPeriod;
 }
 
 export const goalFormSchema = z
@@ -94,12 +93,10 @@ export const goalFormSchema = z
     unit: z.string(),
     customUnit: z.string(),
     isCustomUnit: z.boolean(),
-    // Backend enforces targetValue > 0; mirror it so we fail fast client-side.
-    targetValue: numericString({ fieldLabel: 'Target value', min: 0, minInclusive: false }),
-    amountPerPeriod: optionalNumericString({ fieldLabel: 'Amount per period', min: 0 }),
-    period: z.enum(GOAL_PERIODS),
     active: z.boolean(),
     description: z.string().trim(),
+    targetValue: optionalNumericString({ fieldLabel: 'Target value' }),
+    period: z.enum(GOAL_PERIODS).optional(),
   })
   .transform((values, ctx) => {
     const resolvedUnit = (values.isCustomUnit ? values.customUnit : values.unit).trim();
@@ -113,12 +110,10 @@ export const goalFormSchema = z
     return {
       name: values.name,
       unit: resolvedUnit,
-      targetValue: values.targetValue,
       active: values.active,
       description: values.description,
-      period: values.period,
-      // Empty "amount per period" intentionally falls back to the target value.
-      amountPerPeriod: values.amountPerPeriod ?? values.targetValue,
+      initialTargetValue: values.targetValue,
+      initialPeriod: values.period,
     };
   });
 
@@ -161,7 +156,7 @@ export const targetHistorySchema = z
   .object({
     validFrom: isoDateString,
     validTo: optionalIsoDateString,
-    value: numericString({ fieldLabel: 'Value', min: 0, minInclusive: false }),
+    targetValue: numericString({ fieldLabel: 'Target value', min: 0, minInclusive: false }),
     period: z.enum(TARGET_PERIODS),
   })
   .superRefine((values, ctx) => {

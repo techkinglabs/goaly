@@ -1,7 +1,6 @@
 package org.techkinglabs.service;
 
 import org.techkinglabs.entity.Goal;
-import org.techkinglabs.model.Period;
 import org.techkinglabs.repository.DailyEntryRepository;
 import org.techkinglabs.repository.GoalRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,14 +8,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -50,13 +46,10 @@ class GoalServiceTest {
     }
 
     @Test
-    void testCreateGoal() {
+    void testCreateGoalWithoutTargetHistory() {
         Goal goal = new Goal();
         goal.setName("Sleep at 23:00");
         goal.setUnit("hours");
-        goal.setTargetValue(new BigDecimal("8"));
-        goal.setAmountPerPeriod(new BigDecimal("8"));
-        goal.setPeriod(Period.WEEK);
 
         when(goalRepository.save(any(Goal.class))).thenAnswer(invocation -> {
             Goal g = invocation.getArgument(0);
@@ -66,12 +59,34 @@ class GoalServiceTest {
             return g;
         });
 
-        Goal result = goalService.createGoal(goal);
+        Goal result = goalService.createGoal(goal, null, null);
 
         assertNotNull(result);
         assertEquals(1L, result.getId());
         verify(goalRepository).save(goal);
-        verify(targetHistoryService).addTargetHistory(eq(1L), any(LocalDate.class), any(), eq(new BigDecimal("8")), eq(Period.WEEK));
+        verify(targetHistoryService, never()).addTargetHistory(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void testCreateGoalWithInitialTarget() {
+        Goal goal = new Goal();
+        goal.setName("Run 5km");
+        goal.setUnit("km");
+
+        when(goalRepository.save(any(Goal.class))).thenAnswer(invocation -> {
+            Goal g = invocation.getArgument(0);
+            if (g.getId() == null) {
+                g.setId(1L);
+            }
+            return g;
+        });
+
+        Goal result = goalService.createGoal(goal, BigDecimal.valueOf(5), org.techkinglabs.model.Period.DAY);
+
+        assertNotNull(result);
+        assertEquals(1L, result.getId());
+        verify(goalRepository).save(goal);
+        verify(targetHistoryService).addTargetHistory(eq(1L), any(java.time.LocalDate.class), any(), eq(BigDecimal.valueOf(5)), eq(org.techkinglabs.model.Period.DAY));
     }
 
     @Test
@@ -91,38 +106,17 @@ class GoalServiceTest {
     }
 
     @Test
-    void testUpdateGoalRedirectsChangedValueThroughTargetHistory() {
+    void testUpdateGoal() {
         Long goalId = 1L;
-        LocalDate today = LocalDate.now(clock);
         Goal goal = new Goal();
         goal.setId(goalId);
         goal.setName("Sleep at 23:00");
-        goal.setPeriod(Period.WEEK);
         when(goalRepository.save(any(Goal.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(targetHistoryService.getEffectiveTarget(goalId, today)).thenReturn(new BigDecimal("5"));
 
-        Goal result = goalService.updateGoal(goal, new BigDecimal("8"));
+        Goal result = goalService.updateGoal(goal);
 
-        verify(targetHistoryService).addTargetHistory(eq(goalId), eq(today), any(), eq(new BigDecimal("8")), eq(Period.WEEK));
-        assertEquals(0, new BigDecimal("8").compareTo(result.getTargetValue()));
-        assertEquals(0, new BigDecimal("8").compareTo(result.getAmountPerPeriod()));
-    }
-
-    @Test
-    void testUpdateGoalNoOpWhenEffectiveTargetUnchanged() {
-        Long goalId = 1L;
-        Goal goal = new Goal();
-        goal.setId(goalId);
-        goal.setTargetValue(new BigDecimal("8"));
-        goal.setAmountPerPeriod(new BigDecimal("8"));
-        goal.setPeriod(Period.WEEK);
-        when(goalRepository.save(any(Goal.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(targetHistoryService.getEffectiveTarget(anyLong(), any(LocalDate.class))).thenReturn(new BigDecimal("8"));
-
-        Goal result = goalService.updateGoal(goal, new BigDecimal("8"));
-
-        verify(targetHistoryService, never()).addTargetHistory(anyLong(), any(), any(), any(), any());
-        assertEquals(0, new BigDecimal("8").compareTo(result.getTargetValue()));
+        assertEquals(goal, result);
+        verify(goalRepository, org.mockito.Mockito.atLeastOnce()).save(goal);
     }
 
     @Test

@@ -40,8 +40,6 @@ class TargetHistoryRepositoryIntegrationTest {
         Goal goal = new Goal();
         goal.setName("test");
         goal.setDescription("desc");
-        goal.setAmountPerPeriod(BigDecimal.TWO);
-        goal.setTargetValue(BigDecimal.TEN);
         goal.setUnit("test_unit");
         goal.setActive(true);
 
@@ -51,7 +49,7 @@ class TargetHistoryRepositoryIntegrationTest {
         first.setGoalId(savedGoal.getId());
         first.setValidFrom(LocalDate.of(2026, 9, 28));
         first.setPeriod(Period.WEEK);
-        first.setValue(BigDecimal.TEN);
+        first.setTargetValue(BigDecimal.TEN);
 
         targetHistoryRepository.saveAndFlush(first);
 
@@ -59,7 +57,7 @@ class TargetHistoryRepositoryIntegrationTest {
         duplicate.setGoalId(savedGoal.getId());
         duplicate.setValidFrom(LocalDate.of(2026, 9, 28));
         duplicate.setPeriod(Period.WEEK);
-        duplicate.setValue(BigDecimal.valueOf(20));
+        duplicate.setTargetValue(BigDecimal.valueOf(20));
 
         assertThatThrownBy(() -> targetHistoryRepository.saveAndFlush(duplicate))
                 .isInstanceOf(DataIntegrityViolationException.class);

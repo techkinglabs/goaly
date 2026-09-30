@@ -9,7 +9,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.techkinglabs.entity.Goal;
 import org.techkinglabs.repository.GoalRepository;
-import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @Testcontainers
@@ -33,8 +32,6 @@ class GoalRepositoryIntegrationTest {
         Goal goal = new Goal();
         goal.setName("test");
         goal.setDescription("desc");
-        goal.setAmountPerPeriod(BigDecimal.TWO);
-        goal.setTargetValue(BigDecimal.TEN);
         goal.setUnit("test_unit");
         goal.setActive(true);
 
@@ -47,8 +44,6 @@ class GoalRepositoryIntegrationTest {
 
         assertThat(foundGoal.getName()).isEqualTo("test");
         assertThat(foundGoal.getDescription()).isEqualTo("desc");
-        assertThat(foundGoal.getAmountPerPeriod()).isEqualByComparingTo(BigDecimal.TWO);
-        assertThat(foundGoal.getTargetValue()).isEqualByComparingTo(BigDecimal.TEN);
         assertThat(foundGoal.getUnit()).isEqualTo("test_unit");
         assertThat(foundGoal.isActive()).isTrue();
     }

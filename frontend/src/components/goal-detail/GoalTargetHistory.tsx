@@ -12,7 +12,7 @@ import { CheckIcon, CloseIcon, PencilIcon, PlusIcon, TrashIcon } from '../ui/ico
 interface TargetHistoryInput {
   validFrom: string;
   validTo?: string | null;
-  value: number;
+  targetValue: number;
   period: GoalPeriod;
 }
 
@@ -27,11 +27,11 @@ interface GoalTargetHistoryProps {
 interface FormState {
   validFrom: string;
   validTo: string;
-  value: string;
+  targetValue: string;
   period: GoalPeriod;
 }
 
-const EMPTY_FORM: FormState = { validFrom: '', validTo: '', value: '', period: 'WEEK' };
+const EMPTY_FORM: FormState = { validFrom: '', validTo: '', targetValue: '', period: 'WEEK' };
 
 const GoalTargetHistory: React.FC<GoalTargetHistoryProps> = ({
   goal,
@@ -81,7 +81,7 @@ const GoalTargetHistory: React.FC<GoalTargetHistoryProps> = ({
     setEditForm({
       validFrom: entry.validFrom,
       validTo: entry.validTo ?? '',
-      value: String(entry.value),
+        targetValue: String(entry.targetValue),
       period: entry.period ?? 'WEEK',
     });
     setEditErrors({});
@@ -120,10 +120,10 @@ const GoalTargetHistory: React.FC<GoalTargetHistoryProps> = ({
   );
 
   const addPreview = useMemo(() => {
-    const numeric = Number(addForm.value);
-    if (addForm.value.trim() === '' || !Number.isFinite(numeric)) return null;
+    const numeric = Number(addForm.targetValue);
+    if (addForm.targetValue.trim() === '' || !Number.isFinite(numeric)) return null;
     return derivePeriodEquivalents(numeric, addForm.period);
-  }, [addForm.value, addForm.period]);
+  }, [addForm.targetValue, addForm.period]);
 
   return (
     <div className="pane-detail mb-6">
@@ -182,14 +182,14 @@ const GoalTargetHistory: React.FC<GoalTargetHistoryProps> = ({
                 id="target-value"
                 type="number"
                 step="1"
-                value={addForm.value}
-                onChange={(event) =>
-                  setAddForm((previous) => ({ ...previous, value: event.target.value }))
-                }
+                value={addForm.targetValue}
+                  onChange={(event) =>
+                    setAddForm((previous) => ({ ...previous, targetValue: event.target.value }))
+                  }
                 className="form-input mb-0"
-                aria-invalid={Boolean(addErrors.value)}
+                aria-invalid={Boolean(addErrors.targetValue)}
               />
-              <FieldError message={addErrors.value} />
+              <FieldError message={addErrors.targetValue} />
             </div>
             <div>
               <label className="form-label" htmlFor="target-period">
@@ -253,7 +253,7 @@ const GoalTargetHistory: React.FC<GoalTargetHistoryProps> = ({
               {sortedHistory.map((entry) => {
                 const isEditing = editingId === entry.id;
                 const equivalents = derivePeriodEquivalents(
-                  Number(entry.value),
+                  Number(entry.targetValue),
                   entry.period ?? 'WEEK'
                 );
 
@@ -286,11 +286,11 @@ const GoalTargetHistory: React.FC<GoalTargetHistoryProps> = ({
                           <input
                             type="number"
                             step="1"
-                            value={editForm.value}
+                            value={editForm.targetValue}
                             onChange={(event) =>
                               setEditForm((previous) => ({
                                 ...previous,
-                                value: event.target.value,
+                                targetValue: event.target.value,
                               }))
                             }
                             className="form-input mb-0 w-20"
@@ -317,7 +317,7 @@ const GoalTargetHistory: React.FC<GoalTargetHistoryProps> = ({
                       </td>
                       <td className="whitespace-nowrap text-sm">
                         <FieldError
-                          message={editErrors.validFrom ?? editErrors.validTo ?? editErrors.value}
+                          message={editErrors.validFrom ?? editErrors.validTo ?? editErrors.targetValue}
                         />
                         <div className="flex items-center gap-1">
                           <button
@@ -353,7 +353,7 @@ const GoalTargetHistory: React.FC<GoalTargetHistoryProps> = ({
                     </td>
                     <td className="whitespace-nowrap text-sm">
                       <div className="font-medium">
-                        {entry.value} {goal.unit}/{PERIOD_LABELS[entry.period ?? 'WEEK']}
+                        {entry.targetValue} {goal.unit}/{PERIOD_LABELS[entry.period ?? 'WEEK']}
                       </div>
                       <div className="text-xs text-[var(--text-muted)]">
                         ≈ {equivalents.day.toFixed(1)}/day · {equivalents.week.toFixed(1)}/wk ·{' '}

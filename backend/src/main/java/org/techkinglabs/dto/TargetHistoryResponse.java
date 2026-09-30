@@ -9,6 +9,6 @@ public record TargetHistoryResponse(
     Long goalId,
     LocalDate validFrom,
     LocalDate validTo,
-    BigDecimal value,
+    BigDecimal targetValue,
     Period period
 ) {}

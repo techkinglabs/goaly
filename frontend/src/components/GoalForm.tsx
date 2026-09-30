@@ -1,6 +1,6 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import type { Goal, GoalPayload } from '../types';
-import { GOAL_PERIODS, GOAL_PERIOD_LABELS, PREDEFINED_UNITS } from '../types';
+import React, { useCallback, useState } from 'react';
+import type { Goal, GoalPayload, GoalPeriod } from '../types';
+import { PREDEFINED_UNITS, GOAL_PERIODS } from '../types';
 import { goalFormSchema, validate, type GoalFormValues } from '../validation/schemas';
 import FieldError from './ui/FieldError';
 import { SpinnerIcon } from './ui/icons';
@@ -23,11 +23,10 @@ function buildInitialValues(goal?: Goal): GoalFormValues {
       unit: '',
       customUnit: '',
       isCustomUnit: false,
-      targetValue: '',
-      amountPerPeriod: '',
-      period: 'WEEK',
       active: true,
       description: '',
+      targetValue: '',
+      period: 'WEEK' as GoalPeriod,
     };
   }
 
@@ -37,12 +36,10 @@ function buildInitialValues(goal?: Goal): GoalFormValues {
     unit: isPredefined ? goal.unit : '',
     customUnit: isPredefined ? '' : goal.unit,
     isCustomUnit: !isPredefined,
-    // Numeric fields are strings in form state — never `number | ''`.
-    targetValue: String(goal.targetValue ?? ''),
-    amountPerPeriod: String(goal.amountPerPeriod ?? goal.targetValue ?? ''),
-    period: goal.period ?? 'WEEK',
     active: goal.active,
     description: goal.description ?? '',
+    targetValue: '',
+    period: 'WEEK' as GoalPeriod,
   };
 }
 
@@ -103,13 +100,10 @@ const GoalForm: React.FC<GoalFormProps> = ({
       await onSubmit({
         name: result.data.name,
         unit: result.data.unit,
-        targetValue: result.data.targetValue,
         active: result.data.active,
         description: result.data.description,
-        period: result.data.period,
-        amountPerPeriod: result.data.amountPerPeriod,
-        // The create endpoint seeds the initial target-history row.
-        ...(mode === 'create' ? { initialTargetValue: result.data.targetValue } : {}),
+        initialTargetValue: result.data.initialTargetValue,
+        initialPeriod: result.data.initialPeriod,
       });
 
       if (mode === 'create') {
@@ -121,11 +115,6 @@ const GoalForm: React.FC<GoalFormProps> = ({
 
   const submitLabel = mode === 'create' ? 'Create Goal' : 'Update Goal';
   const unitSelectValue = values.isCustomUnit ? 'custom' : values.unit;
-
-  const periodOptions = useMemo(
-    () => GOAL_PERIODS.map((period) => ({ value: period, label: GOAL_PERIOD_LABELS[period] })),
-    []
-  );
 
   return (
     <form onSubmit={handleSubmit} className="w-full" noValidate>
@@ -189,61 +178,6 @@ const GoalForm: React.FC<GoalFormProps> = ({
       </div>
 
       <div className="mb-4">
-        <label className="form-label" htmlFor="goal-target-value">
-          Target Value *
-        </label>
-        <input
-          id="goal-target-value"
-          type="number"
-          step="1"
-          value={values.targetValue}
-          onChange={(event) => setField('targetValue', event.target.value)}
-          className="form-input"
-          aria-invalid={Boolean(errors.targetValue)}
-          aria-describedby={errors.targetValue ? 'goal-target-value-error' : undefined}
-        />
-        <FieldError id="goal-target-value-error" message={errors.targetValue} />
-      </div>
-
-      <div className="mb-4">
-        <label className="form-label" htmlFor="goal-period">
-          Period
-        </label>
-        <select
-          id="goal-period"
-          value={values.period}
-          onChange={(event) => setField('period', event.target.value)}
-          className="form-input"
-        >
-          {periodOptions.map(({ value, label }) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {mode === 'edit' ? (
-        <div className="mb-4">
-          <label className="form-label" htmlFor="goal-amount-per-period">
-            Amount per Period
-          </label>
-          <input
-            id="goal-amount-per-period"
-            type="number"
-            step="1"
-            value={values.amountPerPeriod}
-            onChange={(event) => setField('amountPerPeriod', event.target.value)}
-            placeholder="Defaults to Target Value if empty"
-            className="form-input"
-            aria-invalid={Boolean(errors.amountPerPeriod)}
-            aria-describedby={errors.amountPerPeriod ? 'goal-amount-error' : undefined}
-          />
-          <FieldError id="goal-amount-error" message={errors.amountPerPeriod} />
-        </div>
-      ) : null}
-
-      <div className="mb-4">
         <label className="flex items-center">
           <input
             type="checkbox"
@@ -267,6 +201,47 @@ const GoalForm: React.FC<GoalFormProps> = ({
           rows={3}
         />
       </div>
+
+      {mode === 'create' ? (
+        <>
+          <div className="mb-4">
+            <label className="form-label" htmlFor="goal-target-value">
+              Target Value
+            </label>
+            <input
+              id="goal-target-value"
+              type="number"
+              step="0.01"
+              min="0"
+              value={values.targetValue}
+              onChange={(event) => setField('targetValue', event.target.value)}
+              className="form-input"
+              placeholder="e.g. 5"
+              aria-invalid={Boolean(errors.targetValue)}
+              aria-describedby={errors.targetValue ? 'goal-target-value-error' : undefined}
+            />
+            <FieldError id="goal-target-value-error" message={errors.targetValue} />
+          </div>
+
+          <div className="mb-4">
+            <label className="form-label" htmlFor="goal-period">
+              Period
+            </label>
+            <select
+              id="goal-period"
+              value={values.period}
+              onChange={(event) => setField('period', event.target.value as GoalPeriod)}
+              className="form-input"
+            >
+              {GOAL_PERIODS.map((period) => (
+                <option key={period} value={period}>
+                  {period}
+                </option>
+              ))}
+            </select>
+          </div>
+        </>
+      ) : null}
 
       <FieldError message={errors._form} />
 

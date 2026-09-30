@@ -61,8 +61,6 @@ class ChartDataServiceTest {
     private Goal goal() {
         Goal g = new Goal();
         g.setId(1L);
-        g.setTargetValue(BigDecimal.valueOf(10));
-        g.setPeriod(Period.WEEK);
         return g;
     }
 
@@ -70,7 +68,7 @@ class ChartDataServiceTest {
         TargetHistory h = new TargetHistory();
         h.setGoalId(1L);
         h.setValidFrom(from);
-        h.setValue(BigDecimal.valueOf(10));
+        h.setTargetValue(BigDecimal.valueOf(10));
         h.setPeriod(Period.WEEK);
         return h;
     }
