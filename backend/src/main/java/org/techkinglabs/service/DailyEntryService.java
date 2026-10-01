@@ -2,6 +2,7 @@ package org.techkinglabs.service;
 
 import org.springframework.transaction.annotation.Transactional;
 import org.techkinglabs.entity.DailyEntry;
+import org.techkinglabs.exception.GoalNotFoundException;
 import org.techkinglabs.exception.ResourceNotFoundException;
 import org.techkinglabs.repository.DailyEntryRepository;
 import org.springframework.stereotype.Service;
@@ -55,7 +56,7 @@ public class DailyEntryService {
             throw new IllegalArgumentException("Entry date must not be in the future");
         }
         if (goalService.getGoalById(entry.getGoalId()).isEmpty()) {
-            throw new ResourceNotFoundException("Goal not found with id: " + entry.getGoalId());
+            throw new GoalNotFoundException(entry.getGoalId());
         }
         BigDecimal effectiveTarget = targetHistoryService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
         entry.setTargetValue(effectiveTarget);
@@ -68,10 +69,11 @@ public class DailyEntryService {
         if (entry.getEntryDate().isAfter(LocalDate.now(clock))) {
             throw new IllegalArgumentException("Entry date must not be in the future");
         }
-        if (goalService.getGoalById(entry.getGoalId()).isEmpty()) {
-            throw new ResourceNotFoundException("Goal not found with id: " + entry.getGoalId());
+        Long goalId = entry.getGoalId();
+        if (goalService.getGoalById(goalId).isEmpty()) {
+            throw new GoalNotFoundException(goalId);
         }
-        BigDecimal effectiveTarget = targetHistoryService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
+        BigDecimal effectiveTarget = targetHistoryService.getEffectiveTarget(goalId, entry.getEntryDate());
         entry.setTargetValue(effectiveTarget);
 
         return dailyEntryRepository.save(entry);

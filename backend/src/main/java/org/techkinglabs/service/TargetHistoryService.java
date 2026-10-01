@@ -8,6 +8,7 @@ import org.techkinglabs.exception.ResourceNotFoundException;
 import org.techkinglabs.model.Period;
 import org.techkinglabs.repository.GoalRepository;
 import org.techkinglabs.repository.TargetHistoryRepository;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -52,16 +53,16 @@ public class TargetHistoryService {
         TargetHistory history;
         if (existing.isPresent() && existing.get().getValidFrom().isEqual(validFrom)) {
             history = existing.get();
+            TargetHistory overlapping = targetHistoryRepository
+                    .findOverlapping(goalId, validFrom, history.getId())
+                    .orElse(null);
+            if (overlapping != null) {
+                throw new IllegalArgumentException("validFrom " + validFrom + " overlaps an existing target history on goal " + goalId);
+            }
             history.setTargetValue(value);
             history.setPeriod(period);
             if (validTo != null) {
                 history.setValidTo(validTo);
-            }
-            TargetHistory overlapping = targetHistoryRepository
-                    .findOverlappingOnDate(goalId, validTo, history.getId())
-                    .orElse(null);
-            if (overlapping != null) {
-                throw new IllegalArgumentException("validTo " + validTo + " overlaps an existing target history on goal " + goalId);
             }
         } else {
             TargetHistory overlapping = targetHistoryRepository

@@ -59,7 +59,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ex.getStatusCode())
                 .body(Map.of("error", errorLabel, "message", reason != null && !reason.isBlank() ? reason : ""));
     }
-    @SuppressWarnings("unused")
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
         log.error("Unhandled exception", ex);

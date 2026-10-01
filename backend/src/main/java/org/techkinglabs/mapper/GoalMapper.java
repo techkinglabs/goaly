@@ -46,8 +46,6 @@ public class GoalMapper {
         goal.setUnit(request.unit());
         goal.setActive(request.active() != null ? request.active() : true);
         goal.setDescription(request.description());
-        // targetValue/period/amountPerPeriod are now managed exclusively via
-        // TargetHistory; Goal itself no longer carries them.
         return goal;
     }
 

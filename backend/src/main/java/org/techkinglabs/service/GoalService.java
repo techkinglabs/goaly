@@ -4,10 +4,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.techkinglabs.entity.Goal;
 import org.techkinglabs.exception.GoalNotFoundException;
 import org.techkinglabs.model.Period;
-import org.techkinglabs.repository.GoalRepository;
 import org.techkinglabs.repository.DailyEntryRepository;
+import org.techkinglabs.repository.GoalRepository;
 import org.springframework.stereotype.Service;
-
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -18,7 +17,6 @@ import java.util.Optional;
 public class GoalService {
 
     private final GoalRepository goalRepository;
-
     private final DailyEntryRepository dailyEntryRepository;
     private final TargetHistoryService targetHistoryService;
     private final Clock clock;
@@ -72,5 +70,10 @@ public class GoalService {
         targetHistoryService.deleteAllTargetHistoryByGoalId(id);
 
         goalRepository.delete(goal);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Goal> getAllGoals() {
+        return goalRepository.findAll();
     }
 }

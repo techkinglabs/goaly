@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -30,6 +31,8 @@ class TargetHistoryServiceTest {
 
     @Mock
     private GoalRepository goalRepository;
+
+    private final Clock clock = Clock.systemUTC();
 
     @InjectMocks
     private TargetHistoryService targetHistoryService;
@@ -56,43 +59,45 @@ class TargetHistoryServiceTest {
     @Test
     void testAddTargetHistoryEditsExistingRecordWithNullValidTo() {
         Long goalId = 1L;
+        LocalDate validFrom = LocalDate.of(2026, 1, 5);
 
         TargetHistory existing = new TargetHistory();
         existing.setId(2L);
         existing.setGoalId(goalId);
-        existing.setValidFrom(LocalDate.of(2026, 1, 5));
+        existing.setValidFrom(validFrom);
         existing.setTargetValue(new BigDecimal("4"));
-        when(targetHistoryRepository.findFirstByGoalIdAndValidFromLessThanEqualOrderByValidFromDesc(goalId, LocalDate.of(2026, 1, 5)))
+        when(targetHistoryRepository.findFirstByGoalIdAndValidFromLessThanEqualOrderByValidFromDesc(goalId, validFrom))
                 .thenReturn(Optional.of(existing));
-        when(targetHistoryRepository.findOverlappingOnDate(goalId, null, 2L))
+        when(targetHistoryRepository.findOverlapping(goalId, validFrom, 2L))
                 .thenReturn(Optional.empty());
         when(targetHistoryRepository.findByGoalIdOrderByValidFromAsc(goalId))
                 .thenReturn(List.of(existing));
         when(targetHistoryRepository.save(any(TargetHistory.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        TargetHistory result = targetHistoryService.addTargetHistory(goalId, LocalDate.of(2026, 1, 5), null,
+        TargetHistory result = targetHistoryService.addTargetHistory(goalId, validFrom, null,
                 new BigDecimal("7"), Period.WEEK);
 
         assertEquals(existing, result);
-        verify(targetHistoryRepository).findOverlappingOnDate(goalId, null, 2L);
+        verify(targetHistoryRepository).findOverlapping(goalId, validFrom, 2L);
     }
 
     @Test
     void testAddTargetHistoryDetectsOverlapWhenValidToIsNull() {
         Long goalId = 1L;
+        LocalDate validFrom = LocalDate.of(2026, 1, 5);
 
         TargetHistory existing = new TargetHistory();
         existing.setId(2L);
         existing.setGoalId(goalId);
-        existing.setValidFrom(LocalDate.of(2026, 1, 5));
-        when(targetHistoryRepository.findFirstByGoalIdAndValidFromLessThanEqualOrderByValidFromDesc(goalId, LocalDate.of(2026, 1, 5)))
+        existing.setValidFrom(validFrom);
+        when(targetHistoryRepository.findFirstByGoalIdAndValidFromLessThanEqualOrderByValidFromDesc(goalId, validFrom))
                 .thenReturn(Optional.of(existing));
 
-        when(targetHistoryRepository.findOverlappingOnDate(goalId, null, 2L))
+        when(targetHistoryRepository.findOverlapping(goalId, validFrom, 2L))
                 .thenReturn(Optional.of(new TargetHistory()));
 
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> targetHistoryService.addTargetHistory(goalId, LocalDate.of(2026, 1, 5), null,
+                () -> targetHistoryService.addTargetHistory(goalId, validFrom, null,
                         new BigDecimal("7"), Period.WEEK));
         assertTrue(ex.getMessage().contains("overlaps"));
         verify(targetHistoryRepository, never()).save(any());
@@ -183,14 +188,14 @@ class TargetHistoryServiceTest {
         current.setId(historyId);
         current.setGoalId(goalId);
         current.setTargetValue(new BigDecimal("5"));
-        current.setValidFrom(LocalDate.now().minusDays(10));
+        current.setValidFrom(LocalDate.now(clock).minusDays(10));
         current.setPeriod(Period.WEEK);
 
         TargetHistory previous = new TargetHistory();
         previous.setId(1L);
         previous.setGoalId(goalId);
         previous.setTargetValue(new BigDecimal("3"));
-        previous.setValidFrom(LocalDate.now().minusDays(30));
+        previous.setValidFrom(LocalDate.now(clock).minusDays(30));
         previous.setPeriod(Period.MONTH);
 
         when(targetHistoryRepository.findById(historyId)).thenReturn(Optional.of(current));

@@ -6,7 +6,6 @@ import org.techkinglabs.entity.DailyEntry;
 import org.techkinglabs.entity.Goal;
 import org.techkinglabs.entity.TargetHistory;
 import org.techkinglabs.model.Period;
-import org.techkinglabs.repository.GoalRepository;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -19,15 +18,15 @@ import java.util.*;
 public class ChartDataService {
 
     private final DailyEntryService dailyEntryService;
-    private final GoalRepository goalRepository;
+    private final GoalService goalService;
     private final Clock clock;
     private final TargetHistoryService targetHistoryService;
 
     public ChartDataService(DailyEntryService dailyEntryService,
-                            GoalRepository goalRepository,
+                            GoalService goalService,
                             Clock clock, TargetHistoryService targetHistoryService) {
         this.dailyEntryService = dailyEntryService;
-        this.goalRepository = goalRepository;
+        this.goalService = goalService;
         this.clock = clock;
         this.targetHistoryService = targetHistoryService;
     }
@@ -38,7 +37,7 @@ public class ChartDataService {
         LocalDate anchorDate = anchor != null ? anchor : today;
         LocalDate from = resolveFrom(range, anchorDate);
         List<DailyEntry> entries = dailyEntryService.getEntriesFrom(from);
-        List<Goal> goals = goalRepository.findAll();
+        List<Goal> goals = goalService.getAllGoals();
         Map<Long, List<TargetHistory>> histories = targetHistoryService.getTargetHistoryByGoalIds(
                 goals.stream().map(Goal::getId).toList());
         return buildSeries(entries, goals, histories, range, anchor);
