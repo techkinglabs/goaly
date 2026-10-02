@@ -3,6 +3,7 @@ package org.techkinglabs.service;
 import org.techkinglabs.entity.DailyEntry;
 import org.techkinglabs.entity.Goal;
 import org.techkinglabs.repository.DailyEntryRepository;
+import org.techkinglabs.repository.GoalRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -26,10 +27,10 @@ class DailyEntryServiceTest {
     private DailyEntryRepository dailyEntryRepository;
 
     @Mock
-    private GoalService goalService;
+    private GoalRepository goalRepository;
 
     @Mock
-    private  TargetHistoryService targetHistoryService;
+    private TargetHistoryService targetHistoryService;
 
     @Mock
     private Clock clock;
@@ -69,7 +70,7 @@ class DailyEntryServiceTest {
         entry.setTargetValue(new BigDecimal("8"));
 
         when(targetHistoryService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate())).thenReturn(new BigDecimal("12"));
-        when(goalService.getGoalById(1L)).thenReturn(Optional.of(new Goal(1L, null, null, true, "desc")));
+        when(goalRepository.findById(1L)).thenReturn(Optional.of(new Goal(1L, null, null, true, "desc")));
         when(dailyEntryRepository.save(entry)).thenReturn(entry);
 
         DailyEntry result = dailyEntryService.createDailyEntry(entry);
@@ -91,7 +92,7 @@ class DailyEntryServiceTest {
         moved.setGoalId(1L);
         moved.setEntryDate(LocalDate.of(2026, 1, 1));
 
-        when(goalService.getGoalById(moved.getGoalId())).thenReturn(Optional.of(new Goal(1L, null, null, true, "desc")));
+        when(goalRepository.findById(moved.getGoalId())).thenReturn(Optional.of(new Goal(1L, null, null, true, "desc")));
         when(targetHistoryService.getEffectiveTarget(moved.getGoalId(), moved.getEntryDate())).thenReturn(new BigDecimal("9"));
         when(dailyEntryRepository.save(moved)).thenReturn(moved);
 
@@ -108,7 +109,7 @@ class DailyEntryServiceTest {
         entry.setGoalId(1L);
         entry.setEntryDate(LocalDate.of(2026, 1, 1));
 
-        when(goalService.getGoalById(entry.getGoalId())).thenReturn(Optional.of(new Goal(1L, null, null, true, "desc")));
+        when(goalRepository.findById(entry.getGoalId())).thenReturn(Optional.of(new Goal(1L, null, null, true, "desc")));
         when(targetHistoryService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate())).thenReturn(new BigDecimal("9"));
         when(dailyEntryRepository.save(entry)).thenReturn(entry);
 

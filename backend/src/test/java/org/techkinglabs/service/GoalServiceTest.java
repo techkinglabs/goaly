@@ -1,7 +1,6 @@
 package org.techkinglabs.service;
 
 import org.techkinglabs.entity.Goal;
-import org.techkinglabs.repository.DailyEntryRepository;
 import org.techkinglabs.repository.GoalRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,7 +26,7 @@ class GoalServiceTest {
     private GoalRepository goalRepository;
 
     @Mock
-    private DailyEntryRepository dailyEntryRepository;
+    private DailyEntryService dailyEntryService;
 
     @Mock
     private TargetHistoryService targetHistoryService;
@@ -130,7 +129,7 @@ class GoalServiceTest {
         goalService.deleteGoal(id);
 
         verify(goalRepository).findById(id);
-        verify(dailyEntryRepository).deleteByGoalId(id);
+        verify(dailyEntryService).deleteDailyEntriesByGoalId(id);
         verify(targetHistoryService).deleteAllTargetHistoryByGoalId(id);
         verify(goalRepository).delete(goal);
     }
@@ -143,7 +142,7 @@ class GoalServiceTest {
         assertThrows(org.techkinglabs.exception.ResourceNotFoundException.class,
                 () -> goalService.deleteGoal(id));
         verify(goalRepository).findById(id);
-        verify(dailyEntryRepository, never()).deleteByGoalId(anyLong());
+        verify(dailyEntryService, never()).deleteDailyEntriesByGoalId(anyLong());
         verify(goalRepository, never()).delete(any());
     }
 }
