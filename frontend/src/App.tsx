@@ -43,6 +43,8 @@ const App: React.FC = () => {
     syncGoal,
   } = useGoals(goalFilter);
 
+  const { goals: allGoals, isLoading: isLoadingAllGoals } = useGoals('all');
+
   const {
     entries,
     totalsByGoalId,
@@ -135,7 +137,7 @@ const App: React.FC = () => {
 
   const handleGoalUpdated = useCallback((goal: Goal) => syncGoal(goal), [syncGoal]);
 
-  const isInitialLoading = isLoadingGoals || isLoadingEntries;
+  const isInitialLoading = isLoadingGoals || isLoadingEntries || isLoadingAllGoals;
   const loadError = goalsError ?? entriesError;
 
   const retry = useCallback(() => {
@@ -187,27 +189,28 @@ const App: React.FC = () => {
               />
             ) : null}
 
-            {activeTab === 'entries' ? (
-              <EntriesView
-                entries={entries}
-                goals={goals}
-                onCreateEntry={handleCreateEntry}
-                onUpdateEntry={handleUpdateEntry}
-                onDeleteEntry={handleDeleteEntry}
-                isCreating={isCreatingEntry}
-                isUpdating={isUpdatingEntry}
-                deletingEntryId={deletingEntryId}
-              />
-            ) : null}
+             {activeTab === 'entries' ? (
+               <EntriesView
+                 entries={entries}
+                 goals={allGoals}
+                 onCreateEntry={handleCreateEntry}
+                 onUpdateEntry={handleUpdateEntry}
+                 onDeleteEntry={handleDeleteEntry}
+                 isCreating={isCreatingEntry}
+                 isUpdating={isUpdatingEntry}
+                 deletingEntryId={deletingEntryId}
+               />
+             ) : null}
 
-            {activeTab === 'charts' ? (
-              <ChartsView
-                goals={goals}
-                isDarkMode={isDarkMode}
-                range={chartRange}
-                onRangeChange={setChartRange}
-              />
-            ) : null}
+             {activeTab === 'charts' ? (
+               <ChartsView
+                 goals={allGoals}
+                 entries={entries}
+                 isDarkMode={isDarkMode}
+                 range={chartRange}
+                 onRangeChange={setChartRange}
+               />
+             ) : null}
           </ErrorBoundary>
         )}
       </main>

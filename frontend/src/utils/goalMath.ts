@@ -47,7 +47,10 @@ export function effectiveHistoryEntry(
   let best: TargetHistoryEntry | null = null;
   for (const entry of history) {
     const from = parseLocalDate(entry.validFrom);
-    if (from <= date && (best === null || from > parseLocalDate(best.validFrom))) {
+    if (from > date) continue;
+    const to = entry.validTo ? parseLocalDate(entry.validTo) : null;
+    if (to !== null && date > to) continue;
+    if (best === null || from > parseLocalDate(best.validFrom)) {
       best = entry;
     }
   }
@@ -163,6 +166,99 @@ export function rangeStartDate(range: ChartRange): Date | null {
   }
 }
 
+/**
+ * The scaled target for a chart range, i.e. the total expected value over the
+ * full window. For rolling day ranges (7d/30d/365d) this is the proportional
+ * scaling (periodTarget / daysPerPeriod × windowDays). For calendar-aligned
+ * ranges it is the sum of whole period targets overlapping the window.
+ */
+export function windowScaledTarget(goal: Goal, range: ChartRange, entries?: DailyEntry[]): number {
+  const now = effectiveHistoryEntry(goal, today());
+  const targetVal = now?.targetValue ?? 0;
+  const target = targetVal > 0 ? targetVal : 1;
+  const period = now?.period ?? 'WEEK';
+  const from = rangeStartDate(range);
+  const base = today();
+  const rangeTo = range === 'week' ? addDays(startOfWeek(base), 6) : base;
+  const daysPerPeriod = DAYS_PER_PERIOD[period.toUpperCase()] ?? DAYS_PER_PERIOD.WEEK;
+
+  const rollingDayRange = range === '7d' || range === '30d' || range === '365d';
+  if (rollingDayRange && from !== null) {
+    let total = 0;
+    for (let c = new Date(from); c <= rangeTo; c = addDays(c, 1)) {
+      total += (effectivePeriodTarget(goal, c) || target) / daysPerPeriod;
+    }
+    return total;
+  }
+
+  // "all" range: pre-compute the total target from the first entry date to
+  // today, matching the denominator used in buildProgressSeries.
+  if (from === null) {
+    let firstDate: Date;
+    if (entries && entries.length > 0) {
+      const sorted = [...entries.map((e) => e.entryDate)].sort();
+      firstDate = parseLocalDate(sorted[0]);
+    } else {
+      const history = goal.targetHistory;
+      const firstValidFrom = history && history.length > 0
+        ? [...history].reduce((earliest, h) => h.validFrom < earliest ? h.validFrom : earliest, history[0].validFrom)
+        : toLocalISODate(new Date(base.getFullYear(), 0, 1));
+      firstDate = parseLocalDate(firstValidFrom);
+    }
+    const creditedPeriods = new Set<string>();
+    let total = 0;
+    for (let c = new Date(firstDate); c <= base; c = addDays(c, 1)) {
+      if (isPeriodStart(c, period)) {
+        const ps = periodStartForDate(c, period);
+        if (!creditedPeriods.has(ps)) {
+          total += effectivePeriodTarget(goal, parseLocalDate(ps)) || target;
+          creditedPeriods.add(ps);
+        }
+      }
+    }
+    return total || target;
+  }
+
+  // "year" range: pre-compute the total target for the entire calendar year
+  // (not just elapsed periods), so the raw axis reflects the full annual goal.
+  if (range === 'year') {
+    const yearStart = new Date(base.getFullYear(), 0, 1);
+    const yearEnd = new Date(base.getFullYear(), 11, 31);
+    let total = 0;
+    const creditedPeriods = new Set<string>();
+    for (let c = new Date(yearStart); c <= yearEnd; c = addDays(c, 1)) {
+      if (isPeriodStart(c, period)) {
+        const ps = periodStartForDate(c, period);
+        if (!creditedPeriods.has(ps)) {
+          total += effectivePeriodTarget(goal, parseLocalDate(ps)) || target;
+          creditedPeriods.add(ps);
+        }
+      }
+    }
+    return total || target;
+  }
+
+  // Calendar-aligned: sum of whole period targets overlapping the window.
+  const creditedPeriods2 = new Set<string>();
+  let total = 0;
+  const firstPs = periodStartForDate(from, period);
+  const firstTarget = effectivePeriodTarget(goal, parseLocalDate(firstPs)) || target;
+  if (!creditedPeriods2.has(firstPs)) {
+    total += firstTarget;
+    creditedPeriods2.add(firstPs);
+  }
+  for (let c = new Date(from); c <= rangeTo; c = addDays(c, 1)) {
+    if (isPeriodStart(c, period)) {
+      const ps = periodStartForDate(c, period);
+      if (!creditedPeriods2.has(ps)) {
+        total += effectivePeriodTarget(goal, parseLocalDate(ps)) || target;
+        creditedPeriods2.add(ps);
+      }
+    }
+  }
+  return total;
+}
+
 export interface ProgressPoint {
   entryDate: string;
   dailyProgress: number;
@@ -176,12 +272,16 @@ const round1 = (value: number): number => Math.round(value * 10) / 10;
 /**
  * Builds the cumulative progress series for one goal.
  *
- * Behaviour preserved from the original implementation:
- *  - "all" plots only dates that actually have entries;
+ *  - "all" plots every day from the first entry date to today (so gaps are visible),
+ *    using a fixed denominator (sum of all period targets in range) so cumulative
+ *    is monotonically non-decreasing;
  *  - bounded ranges plot every day in the window (so gaps are visible);
  *  - "this week" extends to Sunday so later-in-week entries appear;
- *  - the cumulative "Total Progress" line accumulates only within the visible
- *    range (it starts at 0 at the range start), so a new week begins at 0.
+ *  - "year" uses a fixed denominator (full calendar-year target) so cumulative
+ *    reflects the true proportion of the annual goal achieved;
+ *  - the cumulative line never uses a clamp — it is naturally non-decreasing for
+ *    fixed-denominator ranges (all/year/7d/30d/365d). The "week" range retains
+ *    its original per-period accumulation + clamp behavior.
  */
 export function buildProgressSeries(
   entries: DailyEntry[],
@@ -201,38 +301,50 @@ export function buildProgressSeries(
   const from = rangeStartDate(range);
 
   if (from === null) {
+    if (valueByDate.size === 0) return [];
+
     const sortedDates = [...valueByDate.keys()].sort((a, b) => a.localeCompare(b));
-    let runningTotal = 0;
-    let runningTarget = 0;
-    const creditedPeriods = new Set<string>();
-    const firstCursor = parseLocalDate(sortedDates[0]);
-    if (!Number.isNaN(firstCursor.getTime())) {
-      const ps = periodStartForDate(firstCursor, period);
-      if (!creditedPeriods.has(ps)) {
-        runningTarget += effectivePeriodTarget(goal, parseLocalDate(ps));
-        creditedPeriods.add(ps);
-      }
-    }
-    return sortedDates.map((date) => {
-      const cursor = parseLocalDate(date);
-      const dayValue = valueByDate.get(date) ?? 0;
-      runningTotal += dayValue;
-      if (isPeriodStart(cursor, period)) {
-        const ps = periodStartForDate(cursor, period);
-        if (!creditedPeriods.has(ps)) {
-          runningTarget += effectivePeriodTarget(goal, cursor);
-          creditedPeriods.add(ps);
+    const firstDate = parseLocalDate(sortedDates[0]);
+    const baseDate = today();
+
+    // Pre-compute the fixed total target for the entire "all" range (first entry
+    // date → today). The denominator sums the effective period target for each
+    // unique period-start within the range (historical for past periods,
+    // projected current target for future periods). Because the denominator is
+    // fixed and `runningTotal` only grows, cumulative progress is monotonically
+    // non-decreasing — it never drops on empty days or when a new period starts.
+    const allCreditedPeriods = new Set<string>();
+    let fixedAllTarget = 0;
+    for (let c = new Date(firstDate); c <= baseDate; c = addDays(c, 1)) {
+      if (isPeriodStart(c, period)) {
+        const ps = periodStartForDate(c, period);
+        if (!allCreditedPeriods.has(ps)) {
+          fixedAllTarget += effectivePeriodTarget(goal, parseLocalDate(ps)) || target;
+          allCreditedPeriods.add(ps);
         }
       }
-      const cumulative = runningTarget > 0 ? (runningTotal / runningTarget) * 100 : 0;
-      return {
-        entryDate: date,
-        dailyProgress: round1((dayValue / target) * 100),
+    }
+
+    let runningTotal = 0;
+    const points: ProgressPoint[] = [];
+    for (let cursor = new Date(firstDate); cursor <= baseDate; cursor = addDays(cursor, 1)) {
+      const key = toLocalISODate(cursor);
+      const dayValue = valueByDate.get(key) ?? 0;
+      runningTotal += dayValue;
+      const cumulative = fixedAllTarget > 0 ? (runningTotal / fixedAllTarget) * 100 : 0;
+      // dailyProgress uses the same denominator as cumulativeProgress so it
+      // never exceeds cumulative (a single day's value as a share of the
+      // fixed target denominator).
+      const dailyProg = dayValue > 0 ? round1((dayValue / fixedAllTarget) * 100) : 0;
+      points.push({
+        entryDate: key,
+        dailyProgress: dailyProg,
         dailyProgressRaw: dayValue,
         cumulativeProgress: round1(cumulative),
         cumulativeProgressRaw: runningTotal,
-      };
-    });
+      });
+    }
+    return points;
   }
 
   const base = today();
@@ -242,26 +354,40 @@ export function buildProgressSeries(
   const points: ProgressPoint[] = [];
 
   // Rolling day-based ranges (7d/30d/365d) measure cumulative progress against
-  // the *elapsed time* within the window: the denominator grows proportionally
-  // with the number of days that have passed (periodTarget × elapsedDays /
-  // daysPerPeriod). A 7-day window is exactly one period of elapsed time, so it
-  // always counts one period target even when it straddles two calendar weeks
-  // (e.g. Tue→Mon) — avoiding the old bug where the line was 0 until the final
-  // day, and avoiding double-counting two calendar weeks for only 7 days.
+  // the full window's expected target: the denominator is the *total* target for
+  // the entire window (proportional to elapsed days), computed once up front.
+  // Because the denominator is fixed and `runningTotal` only grows, cumulative
+  // progress is monotonically non-decreasing — it never drops on empty days.
+  // The target effective at each day is used (honoring target-history changes
+  // and `validTo`), so mid-window target changes are correctly reflected.
+  // Days before the first history entry fall back to the current target so they
+  // still contribute to the denominator.
   const rollingDayRange = range === '7d' || range === '30d' || range === '365d';
   if (rollingDayRange) {
     const daysPerPeriod = DAYS_PER_PERIOD[(period || 'WEEK').toUpperCase()] ?? DAYS_PER_PERIOD.WEEK;
-    const totalDays = Math.round((rangeTo.getTime() - from.getTime()) / 86400000) + 1;
-    const windowTarget = (effectivePeriodTarget(goal, from) / daysPerPeriod) * totalDays;
+    const fallbackTarget = target;
+    // Pre-compute the full-window denominator: sum of daily targets for each day
+    // in the window, using the target effective at that day (or the current
+    // target as a fallback for days before history begins).
+    let windowTarget = 0;
+    for (let c = new Date(from); c <= rangeTo; c = addDays(c, 1)) {
+      const t = effectivePeriodTarget(goal, c) || fallbackTarget;
+      windowTarget += t / daysPerPeriod;
+    }
+
     let runningTotal = 0;
     for (let cursor = new Date(from); cursor <= rangeTo; cursor = addDays(cursor, 1)) {
       const key = toLocalISODate(cursor);
       const dayValue = valueByDate.get(key) ?? 0;
       runningTotal += dayValue;
       const cumulative = windowTarget > 0 ? (runningTotal / windowTarget) * 100 : 0;
+      // Daily progress is relative to the full window's proportional denominator,
+      // so it is always <= cumulative progress (a single day's value as a share of
+      // the total expected target across the window).
+      const dailyProg = dayValue > 0 ? round1((dayValue / windowTarget) * 100) : 0;
       points.push({
         entryDate: key,
-        dailyProgress: dayValue > 0 ? round1((dayValue / target) * 100) : 0,
+        dailyProgress: dailyProg,
         dailyProgressRaw: dayValue,
         cumulativeProgress: round1(cumulative),
         cumulativeProgressRaw: runningTotal,
@@ -270,16 +396,67 @@ export function buildProgressSeries(
     return points;
   }
 
-  // Calendar-aligned ranges (week/year) accumulate whole period targets each
+  // Calendar-aligned ranges (week) accumulate whole period targets each
   // time a new period starts within the window, so a new week begins at 0% and
   // two full weeks compare actual to the sum of both weeks' targets.
+  // The `year` range is handled separately above — it uses a fixed denominator
+  // (the total expected target for the entire year) rather than accumulating
+  // per-period targets, so cumulative progress reflects the true proportion of
+  // the annual goal achieved.
+
+  // Calendar-aligned range (year): fixed denominator = sum of all period
+  // targets whose start falls within the calendar year. For periods already
+  // in the past, use the historical target; for future periods, project the
+  // current (latest) target. Because the denominator is fixed and
+  // `runningTotal` only grows, cumulative progress is naturally monotonically
+  // non-decreasing — no clamp needed.
+  if (range === 'year') {
+    const yearStart = new Date(base.getFullYear(), 0, 1);
+    const yearEnd = new Date(base.getFullYear(), 11, 31);
+
+    // Pre-compute the fixed year target by iterating every day in the year and
+    // summing the target of each unique period-start.
+    let fixedYearTarget = 0;
+    const creditedPeriods = new Set<string>();
+    for (let c = new Date(yearStart); c <= yearEnd; c = addDays(c, 1)) {
+      if (isPeriodStart(c, period)) {
+        const ps = periodStartForDate(c, period);
+        if (!creditedPeriods.has(ps)) {
+          fixedYearTarget += effectivePeriodTarget(goal, parseLocalDate(ps)) || target;
+          creditedPeriods.add(ps);
+        }
+      }
+    }
+
+    let runningTotal = 0;
+    for (let cursor = new Date(from); cursor <= rangeTo; cursor = addDays(cursor, 1)) {
+      const key = toLocalISODate(cursor);
+      const dayValue = valueByDate.get(key) ?? 0;
+      runningTotal += dayValue;
+      const cumulative = fixedYearTarget > 0 ? (runningTotal / fixedYearTarget) * 100 : 0;
+      // dailyProgress uses the same denominator as cumulativeProgress (fixedYearTarget)
+      // so it never exceeds cumulative.
+      const dailyProg = dayValue > 0 ? round1((dayValue / fixedYearTarget) * 100) : 0;
+      points.push({
+        entryDate: key,
+        dailyProgress: dailyProg,
+        dailyProgressRaw: dayValue,
+        cumulativeProgress: round1(cumulative),
+        cumulativeProgressRaw: runningTotal,
+      });
+    }
+    return points;
+  }
+
+  // Calendar-aligned ranges (week)
   let runningTotal = 0;
   let runningTarget = 0;
+  let prevCumulative = 0;
   const creditedPeriods = new Set<string>();
 
   const firstPs = periodStartForDate(from, period);
   if (!creditedPeriods.has(firstPs)) {
-    runningTarget += effectivePeriodTarget(goal, parseLocalDate(firstPs));
+    runningTarget += effectivePeriodTarget(goal, parseLocalDate(firstPs)) || target;
     creditedPeriods.add(firstPs);
   }
 
@@ -290,16 +467,20 @@ export function buildProgressSeries(
     if (isPeriodStart(cursor, period)) {
       const ps = periodStartForDate(cursor, period);
       if (!creditedPeriods.has(ps)) {
-        runningTarget += effectivePeriodTarget(goal, cursor);
+        runningTarget += effectivePeriodTarget(goal, parseLocalDate(ps)) || target;
         creditedPeriods.add(ps);
       }
     }
     const cumulative = runningTarget > 0 ? (runningTotal / runningTarget) * 100 : 0;
+    const dayTarget = effectivePeriodTarget(goal, cursor) || target;
+    const dayPortion = dayTarget / (DAYS_PER_PERIOD[period.toUpperCase()] || DAYS_PER_PERIOD.WEEK);
+    const dailyProg = dayValue > 0 ? round1((dayValue / dayPortion) * 100) : 0;
+    prevCumulative = Math.max(cumulative, prevCumulative);
     points.push({
       entryDate: key,
-      dailyProgress: dayValue > 0 ? round1((dayValue / target) * 100) : 0,
+      dailyProgress: dayValue > 0 ? Math.min(dailyProg, round1(prevCumulative)) : 0,
       dailyProgressRaw: dayValue,
-      cumulativeProgress: round1(cumulative),
+      cumulativeProgress: round1(prevCumulative),
       cumulativeProgressRaw: runningTotal,
     });
   }

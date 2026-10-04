@@ -50,7 +50,7 @@ const ChartCard: React.FC<ChartCardProps> = ({
       </div>
 
       <div
-        className={fullscreen ? 'min-h-0 flex-1' : `h-[300px] min-h-0 ${bodyClassName}`}
+        className={fullscreen ? 'min-h-0 flex-1' : `h-[600px] min-h-0 ${bodyClassName}`}
       >
         {children}
       </div>

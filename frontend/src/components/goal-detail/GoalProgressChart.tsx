@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import type { ChartRange, DailyEntry, Goal } from '../../types';
 import { CHART_RANGE_LABELS, CHART_RANGES } from '../../types';
-import { buildProgressSeries, effectiveGoalTarget } from '../../utils/goalMath';
+import { buildProgressSeries, windowScaledTarget } from '../../utils/goalMath';
 import ChartCard from '../ChartCard';
 import EmptyState from '../ui/EmptyState';
 
@@ -56,17 +56,19 @@ const GoalProgressChart: React.FC<GoalProgressChartProps> = ({
     return ticks;
   }, [percentDomainMax]);
 
+  const roundTick = (v: number) => Math.round(v * 100) / 100;
+
   const rawTicks = useMemo(() => {
-    const targetValue = effectiveGoalTarget(goal);
+    const targetValue = windowScaledTarget(goal, range, entries);
     return [
       0,
-      targetValue / 4,
-      targetValue / 2,
-      (targetValue * 3) / 4,
-      targetValue,
-      Math.max(targetValue, maxTotalRaw),
+      roundTick(targetValue / 4),
+      roundTick(targetValue / 2),
+      roundTick((targetValue * 3) / 4),
+      roundTick(targetValue),
+      roundTick(Math.max(targetValue, maxTotalRaw)),
     ];
-  }, [goal, maxTotalRaw]);
+  }, [goal, range, entries, maxTotalRaw]);
 
   const axisClassName = isDarkMode ? 'dark:fill-gray-300' : 'fill-slate-500';
   const gridClassName = isDarkMode ? 'dark:stroke-gray-700' : 'stroke-slate-200';
@@ -112,9 +114,13 @@ const GoalProgressChart: React.FC<GoalProgressChartProps> = ({
                  yAxisId="raw"
                  orientation="right"
                  className={axisClassName}
-                 domain={[0, Math.max(effectiveGoalTarget(goal), maxTotalRaw)]}
-                 ticks={rawTicks}
-                 tickFormatter={(value) => `${value} ${goal.unit}`}
+                  domain={[0, roundTick(Math.max(windowScaledTarget(goal, range, entries), maxTotalRaw))]}
+                  ticks={rawTicks}
+                  tickFormatter={(value) => {
+                    const rounded = Math.round(value * 100) / 100;
+                    const str = rounded % 1 === 0 ? String(rounded) : rounded.toFixed(1);
+                    return `${str} ${goal.unit}`;
+                  }}
                />
 
               <ReferenceLine

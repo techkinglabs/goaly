@@ -64,7 +64,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({
             actualValue: values.actualValue,
             note: values.note,
           }),
-        { errorMessage: 'Failed to create entry', successMessage: 'Entry added' }
+        { errorMessage: 'Failed to create entry' }
       ),
     [runAction, onCreateEntry, goal.id]
   );
@@ -80,7 +80,7 @@ const GoalDetail: React.FC<GoalDetailProps> = ({
             targetValue: entry.targetValue,
             note: values.note,
           }),
-        { errorMessage: 'Failed to update entry', successMessage: 'Entry updated' }
+        { errorMessage: 'Failed to update entry' }
       ),
     [runAction, onUpdateEntry]
   );

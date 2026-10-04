@@ -1,25 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { Goal } from '../types';
-import type { FlatChartRow } from '../hooks/useChartData';
+import type { ProgressPoint } from '../utils/goalMath';
 import ChartCard from './ChartCard';
 import EmptyState from './ui/EmptyState';
 
 interface ChartViewProps {
-  rows: FlatChartRow[];
+  goals: Goal[];
   isDarkMode: boolean;
-  goals?: Goal[];
+  seriesByGoalId: Map<number, ProgressPoint[]>;
 }
 
 /** Stable palette so each goal keeps its colour across renders. */
@@ -36,21 +25,7 @@ const SERIES_COLORS = [
 
 const colorForIndex = (index: number): string => SERIES_COLORS[index % SERIES_COLORS.length];
 
-const ChartView: React.FC<ChartViewProps> = ({ rows, isDarkMode, goals = [] }) => {
-  const tooltipStyles = useMemo(
-    () => ({
-      contentStyle: {
-        backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
-        borderColor: isDarkMode ? '#374151' : '#e2e8f0',
-      },
-      itemStyle: { color: isDarkMode ? '#f9fafb' : '#0f172a' },
-    }),
-    [isDarkMode]
-  );
-
-  const gridClassName = isDarkMode ? 'dark:stroke-gray-700' : 'stroke-slate-200';
-  const axisClassName = isDarkMode ? 'dark:fill-gray-300' : 'fill-slate-500';
-
+const ChartView: React.FC<ChartViewProps> = ({ goals, isDarkMode, seriesByGoalId }) => {
   const goalNameMap = useMemo(() => {
     const map = new Map<number, string>();
     for (const goal of goals) map.set(goal.id, goal.name);
@@ -100,17 +75,41 @@ const ChartView: React.FC<ChartViewProps> = ({ rows, isDarkMode, goals = [] }) =
     [allGoalIds, visibleGoals]
   );
 
-  const firstGoalId = visibleGoalIds[0] ?? allGoalIds[0];
+  const tooltipStyles = useMemo(
+    () => ({
+      contentStyle: {
+        backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
+        borderColor: isDarkMode ? '#374151' : '#e2e8f0',
+      },
+      itemStyle: { color: isDarkMode ? '#f9fafb' : '#0f172a' },
+    }),
+    [isDarkMode]
+  );
 
-  // Memoized so the bar dataset is not rebuilt on unrelated re-renders.
-  const barChartData = useMemo(() => {
-    if (firstGoalId == null) return [];
-    return rows.map((row) => ({
-      name: row.label,
-      dailyProgress: row[`goal_${firstGoalId}`] ?? 0,
-      cumulativeProgress: row[`total_${firstGoalId}`] ?? 0,
-    }));
-  }, [rows, firstGoalId]);
+  const gridClassName = isDarkMode ? 'dark:stroke-gray-700' : 'stroke-slate-200';
+  const axisClassName = isDarkMode ? 'dark:fill-gray-300' : 'fill-slate-500';
+
+  // Merge all visible goals' progress points into a single chart dataset.
+  // Each row has: entryDate, dailyProgress, cumulativeProgress (percentages),
+  // plus the raw values for tooltip display.
+  const chartData = useMemo(() => {
+    const merged = new Map<string, Record<string, unknown>>();
+
+    for (const id of visibleGoalIds) {
+      const points = seriesByGoalId.get(id);
+      if (!points) continue;
+      for (const point of points) {
+        const row = merged.get(point.entryDate) ?? { entryDate: point.entryDate };
+        row[`goal_${id}`] = point.dailyProgress;
+        row[`total_${id}`] = point.cumulativeProgress;
+        merged.set(point.entryDate, row);
+      }
+    }
+
+    return Array.from(merged.values()).sort((a, b) =>
+      String(a.entryDate).localeCompare(String(b.entryDate))
+    );
+  }, [visibleGoalIds, seriesByGoalId]);
 
   const lineSeries = useMemo(
     () =>
@@ -122,10 +121,13 @@ const ChartView: React.FC<ChartViewProps> = ({ rows, isDarkMode, goals = [] }) =
     [visibleGoalIds, goalNameMap]
   );
 
-  const firstGoalName = firstGoalId != null ? goalNameMap.get(firstGoalId) : undefined;
-
   return (
     <div>
+      {import.meta.env.DEV && (
+        <div className="rounded bg-yellow-100 p-2 text-xs text-yellow-900">
+          Debug: goals={goals.length} ({goals.map(g => g.id).join(',')}), visibleGoalIds={visibleGoalIds.length}, chartData={chartData.length}, seriesByGoalId={Array.from(seriesByGoalId.entries()).map(([k, v]) => `${k}:${v.length}`).join(', ')}
+        </div>
+      )}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="form-label mb-0">Goals:</span>
         {allGoalIds.map((id) => (
@@ -147,21 +149,54 @@ const ChartView: React.FC<ChartViewProps> = ({ rows, isDarkMode, goals = [] }) =
         ) : null}
       </div>
 
-      {rows.length === 0 ? (
+      {chartData.length === 0 ? (
         <EmptyState
           title="No progress data available"
           description="Log a daily entry to start seeing your progress here."
         />
       ) : (
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-          <ChartCard title="Progress Over Time">
+        <div className="grid grid-cols-1 items-start gap-6">
+          <ChartCard title="Progress Over Time" fullscreenHeight="80vh">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={rows} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" className={gridClassName} />
-                <XAxis dataKey="label" className={axisClassName} />
+                <XAxis dataKey="entryDate" className={axisClassName} tick={{ fontSize: 12 }} />
                 <YAxis className={axisClassName} />
-                <Tooltip {...tooltipStyles} />
-                <Legend />
+                <Tooltip
+                  {...tooltipStyles}
+                  labelFormatter={(label) => label}
+                  formatter={(value, name) => [value, name]}
+                />
+                <Legend
+                  content={() => {
+                    return (
+                      <ul className="flex flex-wrap items-center justify-center gap-4 pt-2">
+                        {visibleGoalIds.map((id) => {
+                          const series = lineSeries.find((s) => s.id === id);
+                          if (!series) return null;
+                          return (
+                            <li
+                              key={id}
+                              className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)]"
+                            >
+                              <span
+                                className="inline-block h-2.5 w-4 cursor-pointer rounded-sm"
+                                style={{ backgroundColor: series.color }}
+                                onClick={() => toggleGoal(id)}
+                              />
+                              <span
+                                className="cursor-pointer"
+                                onClick={() => toggleGoal(id)}
+                              >
+                                {series.name}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    );
+                  }}
+                />
                 {lineSeries.map((series) => (
                   <React.Fragment key={series.id}>
                     <Line
@@ -181,26 +216,6 @@ const ChartView: React.FC<ChartViewProps> = ({ rows, isDarkMode, goals = [] }) =
                   </React.Fragment>
                 ))}
               </LineChart>
-            </ResponsiveContainer>
-          </ChartCard>
-
-          <ChartCard
-            title={
-              firstGoalName
-                ? `Period Progress Comparison — ${firstGoalName}`
-                : 'Period Progress Comparison'
-            }
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barChartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" className={gridClassName} />
-                <XAxis dataKey="name" className={axisClassName} />
-                <YAxis className={axisClassName} />
-                <Tooltip {...tooltipStyles} />
-                <Legend />
-                <Bar dataKey="progress" fill="#10b981" name="Daily Progress (%)" />
-                <Bar dataKey="totalProgress" fill="#f59e0b" name="Cumulative Progress (%)" />
-              </BarChart>
             </ResponsiveContainer>
           </ChartCard>
         </div>
