@@ -2,6 +2,8 @@ import React, { useCallback, useMemo, useState } from 'react';
 import type { ChartRange, DailyEntry, DailyEntryPayload, Goal } from '../types';
 import { useTargetHistory } from '../hooks/useTargetHistory';
 import { useAsyncAction } from '../hooks/useAsyncAction';
+import { derivePeriodEquivalents, effectiveHistoryEntry } from '../utils/goalMath';
+import { todayISO } from '../utils/date';
 import GoalEntriesTable, { type InlineEntryValues } from './goal-detail/GoalEntriesTable';
 import GoalProgressChart from './goal-detail/GoalProgressChart';
 import GoalStats from './goal-detail/GoalStats';
@@ -69,21 +71,35 @@ const GoalDetail: React.FC<GoalDetailProps> = ({
     [runAction, onCreateEntry, goal.id]
   );
 
-  const handleUpdateEntry = useCallback(
-    (entry: DailyEntry, values: InlineEntryValues) =>
-      runAction(
-        () =>
-          onUpdateEntry(entry.id, {
-            goalId: entry.goalId,
-            entryDate: values.entryDate,
-            actualValue: values.actualValue,
-            targetValue: entry.targetValue,
-            note: values.note,
-          }),
-        { errorMessage: 'Failed to update entry' }
-      ),
-    [runAction, onUpdateEntry]
-  );
+   const handleUpdateEntry = useCallback(
+     (entry: DailyEntry, values: InlineEntryValues) =>
+       runAction(
+         () =>
+           onUpdateEntry(entry.id, {
+             goalId: entry.goalId,
+             entryDate: values.entryDate,
+             actualValue: values.actualValue,
+             targetValue: entry.targetValue,
+             note: values.note,
+           }),
+         { errorMessage: 'Failed to update entry' }
+       ),
+     [runAction, onUpdateEntry]
+   );
+
+   const handleQuickAdd = useCallback(() => {
+     const historyEntry = effectiveHistoryEntry(goal, new Date());
+     const dailyTarget = derivePeriodEquivalents(
+       historyEntry?.targetValue ?? 0,
+       historyEntry?.period ?? 'WEEK'
+     ).day;
+     void onCreateEntry({
+       goalId: goal.id,
+       entryDate: todayISO(),
+       actualValue: dailyTarget,
+       note: null,
+     });
+   }, [onCreateEntry, goal.id]);
 
   const handleAddTarget = useCallback(
     (input: Parameters<typeof addTarget>[0]) =>
@@ -132,15 +148,16 @@ const GoalDetail: React.FC<GoalDetailProps> = ({
         isMutating={isAdding || isUpdating || isDeleting}
       />
 
-      <GoalEntriesTable
-        goal={goal}
-        entries={goalEntries}
-        onCreate={handleCreateEntry}
-        onUpdate={handleUpdateEntry}
-        onDelete={onDeleteEntry}
-        isMutating={isMutatingEntry}
-        deletingEntryId={deletingEntryId}
-      />
+       <GoalEntriesTable
+         goal={goal}
+         entries={goalEntries}
+         onCreate={handleCreateEntry}
+         onUpdate={handleUpdateEntry}
+         onDelete={onDeleteEntry}
+         onQuickAdd={handleQuickAdd}
+         isMutating={isMutatingEntry}
+         deletingEntryId={deletingEntryId}
+       />
     </div>
   );
 };

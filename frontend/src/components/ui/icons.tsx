@@ -28,6 +28,12 @@ export const PlusIcon: React.FC<IconProps> = ({ className = 'h-5 w-5' }) => (
   </svg>
 );
 
+export const FlashIcon: React.FC<IconProps> = ({ className = 'h-5 w-5' }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
+    <path d="M13 2L4 14h6v8l9-10h-6V2z" />
+  </svg>
+);
+
 export const PencilIcon: React.FC<IconProps> = ({ className = 'h-5 w-5' }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
     <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />

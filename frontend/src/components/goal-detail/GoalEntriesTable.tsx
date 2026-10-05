@@ -1,10 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import type { DailyEntry, Goal } from '../../types';
+import { derivePeriodEquivalents, effectiveHistoryEntry } from '../../utils/goalMath';
 import { formatDate, todayISO } from '../../utils/date';
 import { inlineEntrySchema, validate } from '../../validation/schemas';
 import DatePicker from '../DatePicker';
 import FieldError from '../ui/FieldError';
-import { CheckIcon, CloseIcon, PencilIcon, PlusIcon, TrashIcon } from '../ui/icons';
+import { CheckIcon, CloseIcon, FlashIcon, PencilIcon, PlusIcon, TrashIcon } from '../ui/icons';
 
 export interface InlineEntryValues {
   entryDate: string;
@@ -18,6 +19,7 @@ interface GoalEntriesTableProps {
   onCreate: (values: InlineEntryValues) => void | Promise<unknown>;
   onUpdate?: (entry: DailyEntry, values: InlineEntryValues) => void | Promise<unknown>;
   onDelete?: (id: number) => void | Promise<unknown>;
+  onQuickAdd?: () => void | Promise<unknown>;
   isMutating?: boolean;
   deletingEntryId?: number | null;
 }
@@ -57,6 +59,7 @@ const GoalEntriesTable: React.FC<GoalEntriesTableProps> = ({
   onCreate,
   onUpdate,
   onDelete,
+  onQuickAdd,
   isMutating = false,
   deletingEntryId = null,
 }) => {
@@ -140,18 +143,32 @@ const GoalEntriesTable: React.FC<GoalEntriesTableProps> = ({
 
   return (
     <div className="pane-detail min-h-[70vh]">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-lg font-medium text-[var(--text-primary)]">Recent Entries</h3>
-        <button
-          type="button"
-          onClick={startAdd}
-          className="btn btn-primary rounded-full"
-          title="Add Entry"
-          aria-label="Add entry"
-          disabled={isAdding}
-        >
-          <PlusIcon />
-        </button>
+       <div className="mb-4 flex items-center justify-between">
+         <h3 className="text-lg font-medium text-[var(--text-primary)]">Recent Entries</h3>
+         <div className="flex items-center gap-2">
+           {onQuickAdd ? (
+             <button
+               type="button"
+               onClick={() => void onQuickAdd()}
+               className="btn btn-ghost rounded-full"
+               title="Quick add today's daily target"
+               aria-label="Quick add today's daily target"
+               disabled={isMutating}
+             >
+               <FlashIcon />
+             </button>
+           ) : null}
+           <button
+             type="button"
+             onClick={startAdd}
+             className="btn btn-primary rounded-full"
+             title="Add Entry"
+             aria-label="Add entry"
+             disabled={isAdding}
+           >
+             <PlusIcon />
+          </button>
+        </div>
       </div>
 
       <div className="overflow-x-auto">

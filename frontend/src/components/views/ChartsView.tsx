@@ -57,7 +57,7 @@ const ChartsView: React.FC<ChartsViewProps> = ({ goals, entries, isDarkMode, ran
         </div>
       </div>
 
-      <ChartView goals={goals} seriesByGoalId={seriesByGoalId} isDarkMode={isDarkMode} />
+      <ChartView goals={goals} seriesByGoalId={seriesByGoalId} isDarkMode={isDarkMode} range={range} />
     </div>
   );
 };
