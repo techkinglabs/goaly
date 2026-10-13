@@ -202,15 +202,14 @@ const App: React.FC = () => {
                />
              ) : null}
 
-             {activeTab === 'charts' ? (
-               <ChartsView
-                 goals={allGoals}
-                 entries={entries}
-                 isDarkMode={isDarkMode}
-                 range={chartRange}
-                 onRangeChange={setChartRange}
-               />
-             ) : null}
+              {activeTab === 'charts' ? (
+                <ChartsView
+                  goals={allGoals}
+                  isDarkMode={isDarkMode}
+                  range={chartRange}
+                  onRangeChange={setChartRange}
+                />
+              ) : null}
           </ErrorBoundary>
         )}
       </main>

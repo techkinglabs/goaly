@@ -45,6 +45,9 @@ export interface ChartDataPoint {
   goals: Record<number, number>;
   totals: Record<number, number>;
   targets: Record<number, number>;
+  idealPaths: Record<number, number>;
+  cumulativeRaw: Record<number, number>;
+  dailyRaw: Record<number, number>;
 }
 
 /** Write models — `id` is server-assigned, so it is never part of a payload. */

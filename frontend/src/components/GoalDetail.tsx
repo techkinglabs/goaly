@@ -134,7 +134,6 @@ const GoalDetail: React.FC<GoalDetailProps> = ({
 
       <GoalProgressChart
         goal={goal}
-        entries={goalEntries}
         range={range}
         onRangeChange={setRange}
         isDarkMode={isDarkMode}

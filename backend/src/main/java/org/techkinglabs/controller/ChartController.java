@@ -7,6 +7,7 @@ import org.techkinglabs.repository.GoalRepository;
 import org.techkinglabs.service.ChartDataService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,7 +32,21 @@ public class ChartController {
     public ChartController(ChartDataService chartDataService, GoalRepository goalRepository, Clock clock) {
         this.chartDataService = chartDataService;
         this.goalRepository = goalRepository;
-        this.clock=clock;
+        this.clock = clock;
+    }
+
+    private void validateRange(String range) {
+        if (!ALLOWED_RANGES.contains(range == null ? "" : range.toLowerCase())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Invalid range '" + range + "'. Allowed: 7d, 30d, 365d, week, year, all");
+        }
+    }
+
+    private void validateAnchor(LocalDate anchor) {
+        if (anchor != null && anchor.isAfter(LocalDate.now(clock))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "anchor must not be in the future");
+        }
     }
 
     @GetMapping("/data")
@@ -39,14 +54,8 @@ public class ChartController {
             @RequestParam(required = false) Long goalId,
             @RequestParam(required = false, defaultValue = "all") String range,
             @RequestParam(required = false) LocalDate anchor) {
-        if (!ALLOWED_RANGES.contains(range == null ? "" : range.toLowerCase())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Invalid range '" + range + "'. Allowed: 7d, 30d, 365d, week, year, all");
-        }
-        if (anchor != null && anchor.isAfter(LocalDate.now(clock))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "anchor must not be in the future");
-        }
+        validateRange(range);
+        validateAnchor(anchor);
         String normalizedRange = range == null ? null : range.toLowerCase();
 
         if (goalId != null) {
@@ -56,5 +65,18 @@ public class ChartController {
         }
 
         return chartDataService.getChartDataForAllGoals(normalizedRange, anchor);
+    }
+
+    @GetMapping("/data/{goalId}")
+    public List<ChartDataPoint> getChartDataForGoal(
+            @PathVariable Long goalId,
+            @RequestParam(required = false, defaultValue = "all") String range,
+            @RequestParam(required = false) LocalDate anchor) {
+        validateRange(range);
+        validateAnchor(anchor);
+        String normalizedRange = range == null ? null : range.toLowerCase();
+        Goal goal = goalRepository.findById(goalId)
+                .orElseThrow(() -> new GoalNotFoundException(goalId));
+        return chartDataService.getChartDataForGoal(goal, normalizedRange, anchor);
     }
 }
