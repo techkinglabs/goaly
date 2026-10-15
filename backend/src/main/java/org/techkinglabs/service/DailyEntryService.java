@@ -41,33 +41,12 @@ public class DailyEntryService {
     }
 
     @Transactional(readOnly = true)
-    public List<DailyEntry> getEntriesFrom(LocalDate from) {
-        if (from == null) {
-            return dailyEntryRepository.findAll();
-        }
-        return dailyEntryRepository.findByEntryDateGreaterThanEqualOrderByEntryDate(from);
-    }
-
-    @Transactional(readOnly = true)
     public Optional<DailyEntry> getEntryById(Long id) {
         return dailyEntryRepository.findById(id);
     }
 
     @Transactional
     public DailyEntry createDailyEntry(DailyEntry entry) {
-        if (entry.getEntryDate().isAfter(LocalDate.now(clock))) {
-            throw new IllegalArgumentException("Entry date must not be in the future");
-        }
-        Long goalId = entry.getGoalId();
-        checkIfGoalExists(goalId);
-        BigDecimal effectiveTarget = targetHistoryService.getEffectiveTarget(goalId, entry.getEntryDate());
-        entry.setTargetValue(effectiveTarget);
-
-        return dailyEntryRepository.save(entry);
-    }
-
-    @Transactional
-    public DailyEntry updateDailyEntry(DailyEntry entry) {
         if (entry.getEntryDate().isAfter(LocalDate.now(clock))) {
             throw new IllegalArgumentException("Entry date must not be in the future");
         }
@@ -95,5 +74,17 @@ public class DailyEntryService {
     @Transactional
     public void deleteDailyEntriesByGoalId(Long id) {
         dailyEntryRepository.deleteByGoalId(id);
+    }
+    
+    @Transactional
+    public DailyEntry updateDailyEntry(Long id, DailyEntry entry) {
+        if (entry.getEntryDate().isAfter(LocalDate.now(clock))) {
+            throw new IllegalArgumentException("Entry date must not be in the future");
+        }
+        checkIfGoalExists(entry.getGoalId());
+        BigDecimal effectiveTarget = targetHistoryService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate());
+        entry.setTargetValue(effectiveTarget);
+
+        return dailyEntryRepository.save(entry);
     }
 }

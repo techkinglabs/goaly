@@ -41,6 +41,9 @@ public class ChartDataService {
         LocalDate today = LocalDate.now(clock);
         LocalDate anchorDate = anchor != null ? anchor : today;
         LocalDate from = calculateFromRange(range, anchorDate);
+        // Extend "week" / "year" ranges to the end of the period so the chart
+        // shows the full grid even on the first day of the period.
+        LocalDate to = calculateToForRange(range, anchorDate);
 
         List<Goal> goals = goalRepository.findAll();
         if (goals.isEmpty()) {
@@ -75,7 +78,7 @@ public class ChartDataService {
         Map<Goal, List<DailyEntryChartView>> viewsByGoal = new HashMap<>();
         for (Goal g : goals) {
             List<DailyEntryChartView> views = dailyEntryRepository
-                    .findChartDataByGoalIdAndDateBetween(g.getId(), from, anchorDate);
+                    .findChartDataByGoalIdAndDateBetween(g.getId(), from, to);
             if (!views.isEmpty()) {
                 viewsByGoal.put(g, views);
             }
@@ -84,7 +87,7 @@ public class ChartDataService {
         // Merge all goals' views by date
         Map<LocalDate, Map<Long, BigDecimal>> dailyValuesByDate = mergeViewsByDate(viewsByGoal);
 
-        return buildMergedSeries(dailyValuesByDate, historiesByGoal, goals, range);
+        return buildMergedSeries(dailyValuesByDate, historiesByGoal, goals, from, to);
     }
 
     @Transactional(readOnly = true)
@@ -93,6 +96,10 @@ public class ChartDataService {
         LocalDate today = LocalDate.now(clock);
         endInterval = endInterval != null ? endInterval : today;
         LocalDate from = calculateFromRange(range, endInterval);
+        // For calendar-aligned ranges ("week", "year") the window extends to
+        // the end of the period so users see the full grid even on the first
+        // day of the period (e.g. Monday shows all 7 days of the week).
+        LocalDate to = calculateToForRange(range, endInterval);
 
         if (from == null) {
             LocalDate earliest = dailyEntryRepository.findMinEntryDateByGoalId(goalId);
@@ -102,7 +109,7 @@ public class ChartDataService {
             from = earliest;
         }
 
-        List<DailyEntryChartView> views = dailyEntryRepository.findChartDataByGoalIdAndDateBetween(goalId, from, endInterval);
+        List<DailyEntryChartView> views = dailyEntryRepository.findChartDataByGoalIdAndDateBetween(goalId, from, to);
         if (views.isEmpty()) {
             return List.of();
         }
@@ -113,7 +120,7 @@ public class ChartDataService {
 
         Map<LocalDate, Map<Long, BigDecimal>> dailyValuesByDate = mergeViewsByDate(viewsByGoal);
 
-        return buildMergedSeries(dailyValuesByDate, historiesByGoal, List.of(goal), range);
+        return buildMergedSeries(dailyValuesByDate, historiesByGoal, List.of(goal), from, to);
     }
 
     private Map<LocalDate, Map<Long, BigDecimal>> mergeViewsByDate(Map<Goal, List<DailyEntryChartView>> viewsByGoal) {
@@ -133,7 +140,8 @@ public class ChartDataService {
     private List<ChartDataPoint> buildMergedSeries(Map<LocalDate, Map<Long, BigDecimal>> dailyValuesByDate,
                                                    Map<Long, List<TargetHistory>> historiesByGoal,
                                                    List<Goal> goals,
-                                                   String range) {
+                                                   LocalDate from,
+                                                   LocalDate to) {
 
         if (dailyValuesByDate.isEmpty()) {
             return List.of();
@@ -141,17 +149,33 @@ public class ChartDataService {
 
         Set<Long> goalIds = goals.stream().map(Goal::getId).collect(Collectors.toCollection(LinkedHashSet::new));
 
-        // Per-goal running state
+        // Per-goal running actual (only grows).
         Map<Long, BigDecimal> runningActual = new HashMap<>();
-        Map<Long, BigDecimal> runningTarget = new HashMap<>();
-        Map<Long, BigDecimal> prevCumulativePct = new HashMap<>();
-        Map<Long, Set<String>> creditedPeriods = new HashMap<>();
-
         for (Long gid : goalIds) {
             runningActual.put(gid, BigDecimal.ZERO);
-            runningTarget.put(gid, BigDecimal.ZERO);
-            prevCumulativePct.put(gid, BigDecimal.ZERO);
-            creditedPeriods.put(gid, new HashSet<>());
+        }
+
+        // Fixed window denominator per goal: sum of period targets for every
+        // unique period-start in [from, to]. Because this denominator is fixed
+        // and `runningActual` only grows, `runningActual / windowTarget` is
+        // monotonically non-decreasing — once cumulative exceeds 100% (e.g.
+        // the user did a full week plus more in subsequent weeks), it keeps
+        // climbing rather than plateauing at 100%.
+        Map<Long, BigDecimal> windowTarget = new HashMap<>();
+        for (Long gid : goalIds) {
+            List<TargetHistory> histories = historiesByGoal.getOrDefault(gid, List.of());
+            Set<String> creditedPeriods = new HashSet<>();
+            BigDecimal target = BigDecimal.ZERO;
+            for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
+                Period period = getEffectivePeriod(histories, d);
+                LocalDate ps = periodStartFor(d, period);
+                String psKey = gid + ":" + ps.toString();
+                if (!creditedPeriods.contains(psKey)) {
+                    target = target.add(getEffectiveTarget(histories, d));
+                    creditedPeriods.add(psKey);
+                }
+            }
+            windowTarget.put(gid, target);
         }
 
         List<LocalDate> allDates = dailyValuesByDate.keySet().stream().sorted().toList();
@@ -171,37 +195,24 @@ public class ChartDataService {
 
             for (Long gid : goalIds) {
                 List<TargetHistory> histories = historiesByGoal.getOrDefault(gid, List.of());
-                Period period = getEffectivePeriod(histories, date);
+                BigDecimal effectiveTarget = getEffectiveTarget(histories, date);
 
                 BigDecimal dailyActual = dailyMap.getOrDefault(gid, BigDecimal.ZERO);
                 BigDecimal rActual = runningActual.get(gid).add(dailyActual);
                 runningActual.put(gid, rActual);
 
-                // Credit period targets for the effective period at this date
-                LocalDate ps = periodStartFor(date, period);
-                String psKey = gid + ":" + ps.toString();
-                if (!creditedPeriods.get(gid).contains(psKey)) {
-                    BigDecimal target = getEffectiveTarget(histories, date);
-                    runningTarget.put(gid, runningTarget.get(gid).add(target));
-                    creditedPeriods.get(gid).add(psKey);
-                }
+                BigDecimal wTarget = windowTarget.get(gid);
 
-                BigDecimal effectiveTarget = getEffectiveTarget(histories, date);
-                BigDecimal rTarget = runningTarget.get(gid);
-
-                BigDecimal dailyProgress = effectiveTarget.compareTo(BigDecimal.ZERO) > 0 && dailyActual.compareTo(BigDecimal.ZERO) > 0
-                        ? BigDecimal.valueOf((dailyActual.doubleValue() / effectiveTarget.doubleValue()) * 100)
+                // Daily and cumulative share the same fixed denominator, so a
+                // single day's contribution can never exceed the cumulative
+                // percentage on the chart.
+                BigDecimal dailyProgress = wTarget.compareTo(BigDecimal.ZERO) > 0 && dailyActual.compareTo(BigDecimal.ZERO) > 0
+                        ? BigDecimal.valueOf((dailyActual.doubleValue() / wTarget.doubleValue()) * 100)
                         : BigDecimal.ZERO;
 
-                BigDecimal cumulative = rTarget.compareTo(BigDecimal.ZERO) > 0
-                        ? BigDecimal.valueOf((rActual.doubleValue() / rTarget.doubleValue()) * 100)
+                BigDecimal cumulative = wTarget.compareTo(BigDecimal.ZERO) > 0
+                        ? BigDecimal.valueOf((rActual.doubleValue() / wTarget.doubleValue()) * 100)
                         : BigDecimal.ZERO;
-
-                // Maintain monotonicity for calendar-aligned "week" range
-                if ("week".equalsIgnoreCase(range)) {
-                    cumulative = cumulative.max(prevCumulativePct.get(gid));
-                }
-                prevCumulativePct.put(gid, cumulative);
 
                 // Ideal path: linear 0→100 across all date points
                 double idealPct = totalCount > 1 ? (i / (totalCount - 1.0)) * 100.0 : 0.0;
@@ -240,8 +251,26 @@ public class ChartDataService {
         };
     }
 
+    /**
+     * Inclusive upper bound of the window. Calendar-aligned ranges ("week",
+     * "year") extend to the end of the period so the chart always shows the
+     * full grid even on the first day; rolling ranges stay anchored to today.
+     */
+    private LocalDate calculateToForRange(String range, LocalDate endInterval) {
+        if (range == null) return endInterval;
+        return switch (range.toLowerCase()) {
+            case "week" -> endOfWeek(endInterval);
+            case "year" -> endInterval.withDayOfYear(endInterval.lengthOfYear());
+            default -> endInterval;
+        };
+    }
+
     private LocalDate startOfWeek(LocalDate date) {
         return date.with(DayOfWeek.MONDAY);
+    }
+
+    private LocalDate endOfWeek(LocalDate date) {
+        return date.with(DayOfWeek.SUNDAY);
     }
 
     private LocalDate periodStartFor(LocalDate date, Period period) {

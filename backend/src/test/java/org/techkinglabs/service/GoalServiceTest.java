@@ -89,6 +89,29 @@ class GoalServiceTest {
     }
 
     @Test
+    void testCreateGoalWeeklyInitialTargetCoversWholeCurrentWeek() {
+        // Clock fixed to Wed 2026-01-07 → current week starts Mon 2026-01-05.
+        // Regression: previously validFrom was set to "today", so any entries
+        // logged earlier in the week got target=0 and the chart rendered flat
+        // zero. See the "I added 6 entries this week, chart shows nothing" bug.
+        when(clock.instant()).thenReturn(Instant.parse("2026-01-07T12:00:00Z"));
+        when(goalRepository.save(any(Goal.class))).thenAnswer(invocation -> {
+            Goal g = invocation.getArgument(0);
+            if (g.getId() == null) g.setId(2L);
+            return g;
+        });
+
+        goalService.createGoal(new Goal(), BigDecimal.valueOf(70), org.techkinglabs.model.Period.WEEK);
+
+        verify(targetHistoryService).addTargetHistory(
+                eq(2L),
+                eq(java.time.LocalDate.of(2026, 1, 5)),
+                eq(null),
+                eq(BigDecimal.valueOf(70)),
+                eq(org.techkinglabs.model.Period.WEEK));
+    }
+
+    @Test
     void testGetGoalById() {
         Long id = 1L;
         Goal goal = new Goal();

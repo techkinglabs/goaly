@@ -13,8 +13,10 @@ import {
 import type { ChartRange, Goal } from '../../types';
 import { CHART_RANGE_LABELS, CHART_RANGES } from '../../types';
 import { useChartData } from '../../hooks/useChartData';
+import { windowScaledTarget } from '../../utils/goalMath';
 import ChartCard from '../ChartCard';
 import EmptyState from '../ui/EmptyState';
+import RangeDropdown from '../ui/RangeDropdown';
 import Switch from '../ui/Switch';
 
 interface GoalProgressChartProps {
@@ -69,24 +71,33 @@ const GoalProgressChart: React.FC<GoalProgressChartProps> = ({
 
   const roundTick = (v: number) => Math.round(v * 100) / 100;
 
-  const rawDomainMax = useMemo(
-    () => roundTick(Math.max(maxTotalRaw * 1.1, 1)),
-    [maxTotalRaw]
-  );
+  // Total expected raw value across the current window. For rolling day
+  // ranges (7d/30d/365d) this is proportional (periodTarget/days × windowDays),
+  // for calendar ranges it sums whole period targets. Anchors the right axis
+  // so the target line is always visible regardless of how much the user did.
+  const windowTarget = useMemo(() => windowScaledTarget(goal, range), [goal, range]);
 
+  const rawAxisCeiling = Math.max(maxTotalRaw, windowTarget);
+
+  // Mirror the percent-axis ticks onto the raw axis, scaled by the window
+  // target. So 0%→0, 25%→25% of target, 50%→50% of target, … 100%→target.
   const rawTicks = useMemo(() => {
-    const targetValue = Array.from(chartData).reduce((max, p) => Math.max(max, p.targets[goal.id] ?? 0), 0) * (maxTotalRaw > 0 ? 1 : 0);
-    return [
-      0,
-      roundTick(rawDomainMax / 4),
-      roundTick(rawDomainMax / 2),
-      roundTick((rawDomainMax * 3) / 4),
-      roundTick(rawDomainMax),
-    ];
-  }, [rawDomainMax, chartData, goal.id]);
+    if (windowTarget <= 0) return [0, 1];
+    return percentTicks.map((pct) => roundTick((pct / 100) * windowTarget));
+  }, [percentTicks, windowTarget]);
+
+  const rawDomainMax = Math.max(
+    roundTick((percentDomainMax / 100) * windowTarget),
+    maxTotalRaw,
+  );
 
   const axisClassName = isDarkMode ? 'dark:fill-gray-300' : 'fill-slate-500';
   const gridClassName = isDarkMode ? 'dark:stroke-gray-700' : 'stroke-slate-200';
+
+  const rangeOptions = CHART_RANGES.map((option) => ({
+    value: option,
+    label: CHART_RANGE_LABELS[option],
+  }));
 
   if (error) {
     return (
@@ -105,18 +116,25 @@ const GoalProgressChart: React.FC<GoalProgressChartProps> = ({
     <div className="pane-detail mb-6">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-lg font-medium text-[var(--text-primary)]">Progress Trend</h3>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Chart range">
-          {CHART_RANGES.map((option) => (
-            <button
-              key={option}
-              type="button"
-              onClick={() => onRangeChange(option)}
-              aria-pressed={range === option}
-              className={range === option ? 'btn btn-primary' : 'btn btn-secondary'}
-            >
-              {CHART_RANGE_LABELS[option]}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-3 rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1">
+            <Switch
+              checked={showIdealPath}
+              onChange={() => setShowIdealPath((prev) => !prev)}
+              label="Ideal Path"
+            />
+            <Switch
+              checked={showTargetLine}
+              onChange={() => setShowTargetLine((prev) => !prev)}
+              label="Target"
+            />
+          </div>
+          <RangeDropdown<ChartRange>
+            options={rangeOptions}
+            value={range}
+            onChange={onRangeChange}
+            ariaLabel="Chart range"
+          />
         </div>
       </div>
 
@@ -133,7 +151,7 @@ const GoalProgressChart: React.FC<GoalProgressChartProps> = ({
         <ChartCard title="Progress Trend" fullscreenHeight="80vh" hideTitle>
           <div className="relative h-full w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartDataWithIdeal} margin={{ top: 5, right: 40, left: 20, bottom: 5 }}>
+              <LineChart data={chartDataWithIdeal} margin={{ top: 28, right: 40, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" className={gridClassName} />
                 <XAxis dataKey="entryDate" className={axisClassName} tick={{ fontSize: 12 }} />
                 <YAxis
@@ -165,6 +183,20 @@ const GoalProgressChart: React.FC<GoalProgressChartProps> = ({
                     strokeDasharray="4 4"
                     label={{
                       value: 'Target (100%)',
+                      position: 'insideTopRight',
+                      fill: isDarkMode ? '#9ca3af' : '#64748b',
+                      fontSize: 11,
+                    }}
+                  />
+                ) : null}
+                {showTargetLine && windowTarget > 0 ? (
+                  <ReferenceLine
+                    yAxisId="raw"
+                    y={windowTarget}
+                    stroke={isDarkMode ? '#9ca3af' : '#94a3b8'}
+                    strokeDasharray="4 4"
+                    label={{
+                      value: `Target (${roundTick(windowTarget)} ${goal.unit})`,
                       position: 'insideTopRight',
                       fill: isDarkMode ? '#9ca3af' : '#64748b',
                       fontSize: 11,
@@ -259,10 +291,6 @@ const GoalProgressChart: React.FC<GoalProgressChartProps> = ({
                 />
               </LineChart>
             </ResponsiveContainer>
-            <div className="absolute bottom-14 right-2 flex flex-col gap-1 rounded border border-[var(--border)] bg-[var(--bg-surface)]/80 px-2 py-1.5 backdrop-blur-sm">
-              <Switch checked={showIdealPath} onChange={() => setShowIdealPath((prev) => !prev)} label="Ideal Path" />
-              <Switch checked={showTargetLine} onChange={() => setShowTargetLine((prev) => !prev)} label="Target" />
-            </div>
           </div>
         </ChartCard>
       )}

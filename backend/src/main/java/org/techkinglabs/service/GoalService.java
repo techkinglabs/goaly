@@ -46,13 +46,31 @@ public class GoalService {
         if (initialTargetValue != null && initialPeriod != null) {
             targetHistoryService.addTargetHistory(
                     saved.getId(),
-                    LocalDate.now(clock),
+                    startOfCurrentPeriod(initialPeriod, LocalDate.now(clock)),
                     null,
                     initialTargetValue,
                     initialPeriod
             );
         }
         return saved;
+    }
+
+    /**
+     * Returns the first day of the {@code period} containing {@code today}.
+     * Used as the {@code validFrom} of a freshly seeded target history so that
+     * any entries the user already logged earlier in the same period (e.g.
+     * Monday–Friday of the current week) are credited against the new target.
+     * Without this, {@code getEffectiveTarget(date)} returns 0 for those days
+     * and the chart renders as flat zero.
+     */
+    static LocalDate startOfCurrentPeriod(Period period, LocalDate today) {
+        return switch (period) {
+            case DAY -> today;
+            case WEEK, WORKWEEK -> today.with(java.time.DayOfWeek.MONDAY);
+            case WEEKEND -> today.with(java.time.DayOfWeek.SATURDAY);
+            case MONTH -> today.withDayOfMonth(1);
+            case YEAR -> today.withDayOfYear(1);
+        };
     }
 
     @Transactional

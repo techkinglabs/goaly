@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import type { ChartDataPoint, Goal } from '../types';
+import type { ChartDataPoint, ChartRange, Goal } from '../types';
+import { windowScaledTarget } from '../utils/goalMath';
 import ChartCard from './ChartCard';
 import EmptyState from './ui/EmptyState';
 import Switch from './ui/Switch';
@@ -9,6 +10,7 @@ interface ChartViewProps {
     goals: Goal[];
     isDarkMode: boolean;
     data: ChartDataPoint[];
+    range: ChartRange;
 }
 
 const SERIES_COLORS = [
@@ -24,7 +26,7 @@ const SERIES_COLORS = [
 
 const colorForIndex = (index: number): string => SERIES_COLORS[index % SERIES_COLORS.length];
 
-const ChartView: React.FC<ChartViewProps> = ({ goals, isDarkMode, data }) => {
+const ChartView: React.FC<ChartViewProps> = ({ goals, isDarkMode, data, range: rangeKey }) => {
     const [showIdealPath, setShowIdealPath] = useState(true);
     const [showTargetLine, setShowTargetLine] = useState(true);
 
@@ -99,15 +101,36 @@ const ChartView: React.FC<ChartViewProps> = ({ goals, isDarkMode, data }) => {
     }, [percentDomainMax]);
 
     const rawDomainMax = useMemo(() => {
-        const max = data.reduce((currentMax, point) => {
+        const dataMax = data.reduce((currentMax, point) => {
             let rawMax = currentMax;
             for (const id of visibleGoalIds) {
                 rawMax = Math.max(rawMax, point.cumulativeRaw[id] ?? 0);
             }
             return rawMax;
         }, 0);
-        return Math.round(max * 1.1);
-    }, [data, visibleGoalIds]);
+        // Anchor at least to each visible goal's window target so the "Target"
+        // reference line on the right axis is always visible (e.g. 60/week × 30d
+        // = ~257, not just max(data) × 1.1 = ~145).
+        const targetMax = visibleGoalIds.reduce(
+            (max, id) => {
+                const goal = goals.find((g) => g.id === id);
+                if (!goal) return max;
+                return Math.max(max, windowScaledTarget(goal, rangeKey));
+            },
+            0,
+        );
+        const combined = Math.max(dataMax, targetMax);
+        return combined > 0 ? Math.round(combined * 1.1) : 1;
+    }, [data, visibleGoalIds, goals]);
+
+    const goalTargets = useMemo(
+        () =>
+            visibleGoalIds.map((id) => {
+                const goal = goals.find((g) => g.id === id);
+                return { id, target: goal ? windowScaledTarget(goal, rangeKey) : 0 };
+            }),
+        [visibleGoalIds, goals],
+    );
 
     const tooltipStyles = useMemo(
         () => ({
@@ -173,6 +196,23 @@ const ChartView: React.FC<ChartViewProps> = ({ goals, isDarkMode, data }) => {
 
                                 {showTargetLine && (
                                     <ReferenceLine yAxisId="left" y={100} stroke={isDarkMode ? '#9ca3af' : '#94a3b8'} strokeDasharray="4 4" />
+                                )}
+                                {showTargetLine && goalTargets.map(({ id, target }) =>
+                                    target > 0 ? (
+                                        <ReferenceLine
+                                            key={`target-raw-${id}`}
+                                            yAxisId="right"
+                                            y={target}
+                                            stroke={isDarkMode ? '#9ca3af' : '#94a3b8'}
+                                            strokeDasharray="4 4"
+                                            label={{
+                                                value: `Target (${Math.round(target)})`,
+                                                position: 'insideTopRight',
+                                                fill: isDarkMode ? '#9ca3af' : '#64748b',
+                                                fontSize: 11,
+                                            }}
+                                        />
+                                    ) : null,
                                 )}
 
                                 <Tooltip {...tooltipStyles} />

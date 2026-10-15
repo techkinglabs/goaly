@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -118,7 +119,7 @@ class DailyEntryControllerValidationTest {
         when(dailyEntryService.getEntryById(1L))
                 .thenReturn(Optional.of(dailyEntry));
 
-        when(dailyEntryService.updateDailyEntry(any(DailyEntry.class)))
+        when(dailyEntryService.updateDailyEntry(eq(1L), any(DailyEntry.class)))
                 .thenThrow(new ResourceNotFoundException("Goal not found"));
 
         String json = """
@@ -175,16 +176,11 @@ class DailyEntryControllerValidationTest {
 
     @Test
     void updateDailyEntryShouldReturn200() throws Exception {
-        DailyEntry existingEntry = createDailyEntry();
-
-        when(dailyEntryService.getEntryById(1L))
-                .thenReturn(Optional.of(existingEntry));
-
         DailyEntry updatedEntry = createDailyEntry();
         updatedEntry.setActualValue(BigDecimal.TEN);
         updatedEntry.setNote("updated note");
 
-        when(dailyEntryService.updateDailyEntry(any(DailyEntry.class)))
+        when(dailyEntryService.updateDailyEntry(eq(1L), any(DailyEntry.class)))
                 .thenReturn(updatedEntry);
 
         String updateJson = """
@@ -204,8 +200,7 @@ class DailyEntryControllerValidationTest {
                 .andExpect(jsonPath("$.note").value("updated note"))
                 .andExpect(jsonPath("$.actualValue").value(10));
 
-        verify(dailyEntryService).getEntryById(1L);
-        verify(dailyEntryService).updateDailyEntry(any(DailyEntry.class));
+        verify(dailyEntryService).updateDailyEntry(eq(1L), any(DailyEntry.class));
     }
 
     @Test

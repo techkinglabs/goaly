@@ -52,10 +52,7 @@ public class DailyEntryController {
 
     @PutMapping("/{id}")
     public ResponseEntity<DailyEntryResponse> updateEntry(@PathVariable Long id, @Valid @RequestBody DailyEntryRequest request) {
-        DailyEntry entry = dailyEntryService.getEntryById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Entry not found with id: " + id));
-        DailyEntryMapper.updateEntityFromRequest(request, entry);
-        DailyEntry updatedEntry = dailyEntryService.updateDailyEntry(entry);
+        DailyEntry updatedEntry = dailyEntryService.updateDailyEntry(id, DailyEntryMapper.toEntity(request));
         return ResponseEntity.ok(DailyEntryMapper.toResponse(updatedEntry));
     }
 
