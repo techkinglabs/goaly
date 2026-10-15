@@ -96,7 +96,7 @@ class DailyEntryServiceTest {
         when(targetHistoryService.getEffectiveTarget(moved.getGoalId(), moved.getEntryDate())).thenReturn(new BigDecimal("9"));
         when(dailyEntryRepository.save(moved)).thenReturn(moved);
 
-        DailyEntry result = dailyEntryService.updateDailyEntry(moved);
+        DailyEntry result = dailyEntryService.updateDailyEntry(moved.getId(), moved);
 
         assertEquals(new BigDecimal("9"), result.getTargetValue());
         verify(dailyEntryRepository).save(moved);
@@ -113,7 +113,7 @@ class DailyEntryServiceTest {
         when(targetHistoryService.getEffectiveTarget(entry.getGoalId(), entry.getEntryDate())).thenReturn(new BigDecimal("9"));
         when(dailyEntryRepository.save(entry)).thenReturn(entry);
 
-        DailyEntry result = dailyEntryService.updateDailyEntry(entry);
+        DailyEntry result = dailyEntryService.updateDailyEntry(entry.getId(), entry);
 
         assertEquals(new BigDecimal("9"), result.getTargetValue());
         verify(dailyEntryRepository).save(entry);

@@ -3,7 +3,6 @@ package org.techkinglabs.controller;
 import org.techkinglabs.dto.ChartDataPoint;
 import org.techkinglabs.entity.Goal;
 import org.techkinglabs.exception.GoalNotFoundException;
-import org.techkinglabs.repository.GoalRepository;
 import org.techkinglabs.service.ChartDataService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,10 +11,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.techkinglabs.service.GoalService;
 
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @RestController
@@ -26,12 +27,12 @@ public class ChartController {
             Set.of("7d", "30d", "365d", "week", "year", "all");
 
     private final ChartDataService chartDataService;
-    private final GoalRepository goalRepository;
+    private final GoalService goalService;
     private final Clock clock;
 
-    public ChartController(ChartDataService chartDataService, GoalRepository goalRepository, Clock clock) {
+    public ChartController(ChartDataService chartDataService, GoalService goalService, Clock clock) {
         this.chartDataService = chartDataService;
-        this.goalRepository = goalRepository;
+        this.goalService = goalService;
         this.clock = clock;
     }
 
@@ -59,7 +60,7 @@ public class ChartController {
         String normalizedRange = range == null ? null : range.toLowerCase();
 
         if (goalId != null) {
-            Goal goal = goalRepository.findById(goalId)
+            Goal goal = goalService.getGoalById(goalId)
                     .orElseThrow(() -> new GoalNotFoundException(goalId));
             return chartDataService.getChartDataForGoal(goal, normalizedRange, anchor);
         }
@@ -75,7 +76,7 @@ public class ChartController {
         validateRange(range);
         validateAnchor(anchor);
         String normalizedRange = range == null ? null : range.toLowerCase();
-        Goal goal = goalRepository.findById(goalId)
+        Goal goal = goalService.getGoalById(goalId)
                 .orElseThrow(() -> new GoalNotFoundException(goalId));
         return chartDataService.getChartDataForGoal(goal, normalizedRange, anchor);
     }

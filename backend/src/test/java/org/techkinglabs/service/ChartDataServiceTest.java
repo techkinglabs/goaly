@@ -199,10 +199,11 @@ class ChartDataServiceTest {
 
         // "all" generates daily buckets from first entry (Mar 2) to anchor (Mar 9) = 8 days.
         assertEquals(8, series.size());
-        // Week 1 target = 10 (one WEEK period). Entry of 5 → 50%.
+        // windowTarget = 20 (two WEEK periods, each with target=10). On Mar 2:
+        // runningActual=5 → 5/20 = 25%.
         double week1Cumulative = series.get(0).totals().get(1L);
-        assertEquals(50.0, week1Cumulative, 0.0001);
-        // Week 1 + Week 2 = 20 target. Entries = 10. → 50%.
+        assertEquals(25.0, week1Cumulative, 0.0001);
+        // After both entries of 5, runningActual=10 → 10/20 = 50%.
         double week2Cumulative = series.get(7).totals().get(1L);
         assertEquals(50.0, week2Cumulative, 0.0001);
     }
@@ -357,8 +358,10 @@ class ChartDataServiceTest {
         // "all" range: from earliest entry (Mar 5) to anchor (Mar 10) = 6 days
         assertEquals(6, series.size());
         assertEquals(goal1From.toString(), series.getFirst().label());
-        // First point: goal 1 has 10, goal 2 has 0 (from generate_series)
-        assertEquals(100.0, series.getFirst().goals().get(1L), 0.0001);
+        // First point: goal 1 has 10, goal 2 has 0 (from generate_series).
+        // windowTarget for each goal = 20 (two WEEK periods in [Mar 5, Mar 10]).
+        // Goal 1: 10/20 = 50%.
+        assertEquals(50.0, series.getFirst().goals().get(1L), 0.0001);
         assertEquals(0.0, series.getFirst().goals().get(2L), 0.0001);
     }
 
@@ -481,8 +484,8 @@ class ChartDataServiceTest {
         assertFalse(series.isEmpty());
         // Monday: dailyActual=5, effectiveTarget=10 → 50%
         assertEquals(50.0, series.get(0).goals().get(1L), 0.0001);
-        // Wednesday: dailyActual=5, effectiveTarget=20 → 25%
-        assertEquals(25.0, series.get(2).goals().get(1L), 0.0001);
+        // Wednesday: dailyActual=5, runningTarget=10 (week's target credited on Monday) → 50%
+        assertEquals(50.0, series.get(2).goals().get(1L), 0.0001);
         // Target field should reflect the effective target per date
         assertEquals(10.0, series.get(0).targets().get(1L), 0.0001);
         assertEquals(20.0, series.get(2).targets().get(1L), 0.0001);
@@ -517,15 +520,16 @@ class ChartDataServiceTest {
         List<ChartDataPoint> series = chartDataService.getChartDataForGoal(g, "all", date3);
 
         assertFalse(series.isEmpty());
-        // date1: WEEK, target=14, actual=7 → 50%
+        // date1: WEEK target=14, actual=7; windowTarget covers 2 WEEK periods + 13 DAY periods = 67
+        // → 7/67 = 10.4%
         assertEquals(14.0, series.get(0).targets().get(1L), 0.0001);
-        assertEquals(50.0, series.get(0).goals().get(1L), 0.0001);
-        // date2: DAY, target=3, actual=2 → 66.7%
+        assertEquals(10.4, series.get(0).goals().get(1L), 0.01);
+        // date2: DAY target=3, actual=2; runningActual=9, windowTarget=67 → 2/67 = 3.0%
         assertEquals(3.0, series.get(1).targets().get(1L), 0.0001);
-        assertEquals(66.7, series.get(1).goals().get(1L), 0.01);
-        // date3: DAY, target=3, actual=3 → 100%
+        assertEquals(3.0, series.get(1).goals().get(1L), 0.01);
+        // date3: DAY target=3, actual=3; runningActual=12, windowTarget=67 → 3/67 = 4.5%
         assertEquals(3.0, series.get(2).targets().get(1L), 0.0001);
-        assertEquals(100.0, series.get(2).goals().get(1L), 0.0001);
+        assertEquals(4.5, series.get(2).goals().get(1L), 0.01);
     }
 
     // --- validFrom/validTo boundaries ---
@@ -557,9 +561,9 @@ class ChartDataServiceTest {
         // Mar 2 (Mon): target=10 (validTo=Mar 2, inclusive) → 10/10 = 100%
         assertEquals(10.0, series.get(0).targets().get(1L), 0.0001);
         assertEquals(100.0, series.get(0).goals().get(1L), 0.0001);
-        // Mar 3 (Wed): target=5 (new entry, validFrom=Mar 3) → 5/5 = 100%
+        // Mar 4 (Wed): target=5 (new entry, validFrom=Mar 3), runningTarget=10 (week credited on Mon) → 5/10 = 50%
         assertEquals(5.0, series.get(2).targets().get(1L), 0.0001);
-        assertEquals(100.0, series.get(2).goals().get(1L), 0.0001);
+        assertEquals(50.0, series.get(2).goals().get(1L), 0.0001);
     }
 
     // --- Missing days and zero values ---
@@ -648,8 +652,10 @@ class ChartDataServiceTest {
     }
 
     @Test
-    void testProgressDeclineForNonWeekRange() {
-        // "all" range should allow legitimate decline (no clamp)
+    void testCumulativeNeverDecreasesAcrossPeriodBoundaries() {
+        // Cumulative progress must be monotonically non-decreasing, even when a
+        // new period begins (which would otherwise grow the denominator and
+        // make the ratio drop).
         LocalDate date1 = LocalDate.of(2026, 3, 1);
         LocalDate date2 = LocalDate.of(2026, 3, 8);
         LocalDate date3 = LocalDate.of(2026, 3, 15);
@@ -657,9 +663,9 @@ class ChartDataServiceTest {
 
         when(dailyEntryRepository.findChartDataByGoalIdAndDateBetween(1L, date1, date3))
                 .thenReturn(List.of(
-                        view(date1, 10),  // 10/10 = 100%
-                        view(date2, 0),    // 0/10 (same period, but 0 for this day); cumulative = 10/20 = 50%
-                        view(date3, 0)     // 0/10 (next period); cumulative = 10/30 = 33.3%
+                        view(date1, 10),  // Week 1: 10/10 = 100%
+                        view(date2, 0),    // Week 2 starts: runningTarget doubles, clamp keeps cumulative at 100%
+                        view(date3, 0)     // Week 3: still clamped at 100%
                 ));
         Goal g = goal(1L);
         when(goalRepository.findById(1L)).thenReturn(Optional.of(g));
@@ -671,11 +677,11 @@ class ChartDataServiceTest {
         List<ChartDataPoint> series = chartDataService.getChartDataForGoal(g, "all", date3);
 
         assertEquals(3, series.size());
-        // Week 1: cumulative = 10/10 = 100%
-        assertEquals(100.0, series.get(0).totals().get(1L), 0.0001);
-        // Week 2 starts: cumulative = 10/20 = 50% (legitimate decline, not clamped since "all" range)
-        assertEquals(50.0, series.get(1).totals().get(1L), 0.0001);
-        // Week 3: cumulative = 10/30 = 33.3%
+        // Fixed window denominator (sum of all credited period targets in the
+        // range = 30) ensures cumulative never decreases and can rise above
+        // 100% when the user does more than one full week.
+        assertEquals(33.3, series.get(0).totals().get(1L), 0.01);
+        assertEquals(33.3, series.get(1).totals().get(1L), 0.01);
         assertEquals(33.3, series.get(2).totals().get(1L), 0.01);
     }
 

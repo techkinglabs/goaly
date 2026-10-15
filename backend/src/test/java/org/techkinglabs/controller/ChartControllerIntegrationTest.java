@@ -75,10 +75,10 @@ class ChartControllerIntegrationTest {
     }
 
     private MockMvc buildMockMvc() {
-        org.techkinglabs.repository.GoalRepository goalRepository =
-                mock(org.techkinglabs.repository.GoalRepository.class);
+        org.techkinglabs.service.GoalService goalService =
+                mock(org.techkinglabs.service.GoalService.class);
         Clock clock = Clock.system(ZoneId.of("UTC"));
-        ChartController controller = new ChartController(chartDataService, goalRepository, clock);
+        ChartController controller = new ChartController(chartDataService, goalService, clock);
 
         return MockMvcBuilders.standaloneSetup(controller)
                 .setControllerAdvice(new GlobalExceptionHandler())
