@@ -9,6 +9,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-goaly_db}
       POSTGRES_USER: ${POSTGRES_USER:-goaly_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-goaly_password}
+    mem_limit: 1g
+    memswap_limit: 1g
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -32,16 +34,31 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-goaly_db}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-goaly_user}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-goaly_password}
+      # Backend uses ~750 MB heap + ~250 MB metaspace/native → fits in 1 GB.
+      JVM_OPTS: "-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+    # Hard cap so the JVM can never escape its budget.
+    mem_limit: 1g
+    memswap_limit: 1g
+    cpus: 2.0
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    mem_limit: 64m
+    memswap_limit: 64m
+    cpus: 0.5
     ports:
       - "3002:3002"
     depends_on:
